@@ -163,18 +163,15 @@
 
         // --- Firebase Setup (Secure & Dynamic) ---
         async function initializeFirebase() {
-            /* --- PASTE YOUR FIREBASE CONFIGURATION HERE --- */
-            // You can get this from your Firebase project settings.
-            // Go to Project Settings > General > Your apps > Web app > Firebase SDK snippet > Config
             const firebaseConfig = {
-                // apiKey: "...",
-                // authDomain: "...",
-                // projectId: "...",
-                // storageBucket: "...",
-                // messagingSenderId: "...",
-                // appId: "..."
+                apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc",
+                authDomain: "project-1-f9e5b.firebaseapp.com",
+                projectId: "project-1-f9e5b",
+                storageBucket: "project-1-f9e5b.appspot.com",
+                messagingSenderId: "272340259942",
+                appId: "1:272340259942:web:a5a5a302342e0b4eb389a7",
+                measurementId: "G-EKL8BPFSG1"
             };
-            /* ---------------------------------------------- */
 
             if (!firebaseConfig.apiKey) {
                 console.error("Firebase config is missing!");
