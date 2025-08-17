@@ -324,27 +324,27 @@
 
         async function initializeFirebase() {
             try {
-                // Use the Firebase config provided by the Canvas environment for security
-                const firebaseConfig = JSON.parse(__firebase_config);
+                // Using the specific Firebase config provided by the user
+                const firebaseConfig = {
+                    apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc",
+                    authDomain: "project-1-f9e5b.firebaseapp.com",
+                    projectId: "project-1-f9e5b",
+                    storageBucket: "project-1-f9e5b.appspot.com",
+                    messagingSenderId: "272340259942",
+                    appId: "1:272340259942:web:a5a5a302342e0b4eb389a7",
+                    measurementId: "G-EKL8BPFSG1"
+                };
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 storage = getStorage(app);
 
-                // Authenticate the user using the Canvas provided token
-                const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                if (authToken) {
-                    await signInWithCustomToken(auth, authToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                // Listen for authentication state changes to initialize the app
+                // Reverting to the original sign-in method from the first message
                 onAuthStateChanged(auth, user => {
                     if (user) {
                         userId = user.uid;
-                        // Use the app ID and user ID to ensure data is correctly scoped and secure
-                        itemsCollectionRef = collection(db, `artifacts/${__app_id}/users/${userId}/items`);
+                        // Using the original Firestore path from the user's first message
+                        itemsCollectionRef = collection(db, `users/${userId}/items`);
                         updateUserProfile(user);
                         initializeAppState();
                     } else {
@@ -636,8 +636,8 @@
             trackList.appendChild(placeholderEl);
             const progressSpan = placeholderEl.querySelector('.upload-progress');
 
-            // Use the Canvas app ID and user ID to ensure file paths are isolated and secure
-            const storageRef = ref(storage, `artifacts/${__app_id}/users/${userId}/tracks/${Date.now()}_${file.name}`);
+            // Using the original storage path from the user's first message
+            const storageRef = ref(storage, `users/${userId}/tracks/${Date.now()}_${file.name}`);
             const uploadTask = uploadBytesResumable(storageRef, file);
 
             uploadTask.on('state_changed', 
