@@ -636,7 +636,7 @@
         function listenForTracks(albumId) { if (window.itemsCollectionRef) { const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); if (tracksUnsubscribe) tracksUnsubscribe(); tracksUnsubscribe = onSnapshot(query(tracksRef), s => renderTracks(s.docs.sort((a,b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for tracks:", e)); } }
         
         async function createItem(type) { 
-            if (!window.itemsCollectionRef) return;
+            if (!window.itemsCollectionRef || !auth.currentUser) return;
             
             let name = `New ${type}`;
             let counter = 1;
