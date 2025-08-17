@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project_1</title>
     <!-- Favicon for the site -->
-    <link rel="icon" type="image/png" href="https://placehold.co/32x32/5865F2/FFFFFF?text=P1">
+    <link rel="icon" type="image/png" href="./img/logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -56,7 +56,17 @@
             opacity: 1;
             transform: scale(1);
         }
-        
+        .progress-bar-container {
+            background-color: #4f4f4f;
+            height: 4px;
+            cursor: pointer;
+        }
+        .progress-bar {
+            background-color: #fff;
+            height: 100%;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
         .player-bar button:disabled {
             opacity: 0.4;
             cursor: not-allowed;
@@ -81,13 +91,6 @@
         .player-bar button:hover {
              transform: scale(1.1);
         }
-
-        /* --- Waveform Canvas --- */
-        #waveform-canvas {
-            width: 100%;
-            height: 50px; /* Height of the waveform */
-            cursor: pointer;
-        }
     </style>
 </head>
 <body class="antialiased">
@@ -103,7 +106,7 @@
                     </button>
                     <div class="flex items-center gap-3">
                         <!-- Image Logo -->
-                        <img src="https://placehold.co/32x32/5865F2/FFFFFF?text=P1" alt="Logo" class="h-6 w-6 rounded">
+                        <img src="./img/logo.png" alt="Logo" class="h-6 w-6">
                         <h1 id="header-title" class="text-xl font-bold text-white">project_1</h1>
                     </div>
                 </div>
@@ -151,8 +154,6 @@
                 </div>
             </div>
             <div class="w-1/2 flex flex-col items-center justify-center gap-2">
-                 <!-- Waveform Canvas replaces the progress bar -->
-                <canvas id="waveform-canvas"></canvas>
                 <div class="flex items-center gap-4">
                     <button id="shuffle-btn" class="p-2 hover:text-green-500 transition-colors"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M3.478 5.555A.5.5 0 003 6v8a.5.5 0 00.978.222l2-4a.5.5 0 000-.444l-2-4a.5.5 0 00-.5-.222zM15.5 5.5a.5.5 0 01.978-.222l2 4a.5.5 0 010 .444l-2 4A.5.5 0 0115.5 14V5.5zM12.978 4.222a.5.5 0 00-.956 0l-2.5 5a.5.5 0 000 .556l2.5 5a.5.5 0 00.956-.222l2.5-5a.5.5 0 000-.556l-2.5-5zM6.53 9.098a.5.5 0 000 .804l2 1.5a.5.5 0 00.82-.325V7.923a.5.5 0 00-.82-.325l-2 1.5z"></path></svg></button>
                     <button id="prev-btn" class="p-2"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M8.445 14.832A1 1 0 0010 14.155V5.845a1 1 0 00-1.555-.832L4.12 8.168a1 1 0 000 1.664l4.325 3.001zM15.555 4.168A1 1 0 0014 5.832v8.323a1 1 0 001.555.832l4.325-3.001a1 1 0 000-1.664l-4.325-3.001z"></path></svg></button>
@@ -160,9 +161,11 @@
                     <button id="next-btn" class="p-2"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M4.445 4.168A1 1 0 003 5.832v8.323a1 1 0 001.445.894l4.325-3.001a1 1 0 000-1.788L4.445 4.168zM11.555 4.168A1 1 0 0010 5.832v8.323a1 1 0 001.555.832l4.325-3.001a1 1 0 000-1.664l-4.325-3.001z"></path></svg></button>
                     <button id="stop-btn" class="p-2"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3.75A1.75 1.75 0 003.25 5.5v9A1.75 1.75 0 005 16.25h10A1.75 1.75 0 0016.75 14.5v-9A1.75 1.75 0 0015 3.75H5z"></path></svg></button>
                 </div>
-                <div class="w-full flex items-center gap-2 text-xs -mt-2">
+                <div class="w-full flex items-center gap-2 text-xs">
                     <span id="current-time">0:00</span>
-                    <div class="w-full"></div> <!-- Spacer for canvas -->
+                    <div id="progress-bar-container" class="progress-bar-container w-full rounded-full">
+                        <div id="progress-bar" class="progress-bar rounded-full"></div>
+                    </div>
                     <span id="total-time">0:00</span>
                 </div>
             </div>
@@ -211,7 +214,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- State Management ---
         let currentView = 'grid', currentFolderId = 'root', currentAlbum = null;
@@ -222,16 +224,10 @@
         
         // --- Player State ---
         const audio = new Audio();
-        audio.crossOrigin = "anonymous"; // Required for audio analysis
         let currentPlaylist = [];
         let currentTrackIndex = -1;
         let isPlaying = false;
         let isShuffle = false;
-        
-        // --- Web Audio API for Visualization ---
-        let audioContext, analyser, sourceNode, dataArray;
-        let isAudioContextInitialized = false;
-        let currentVisualizerColors = ['#5865F2', '#FFFFFF']; // Default colors
 
         // --- DOM Elements ---
         const gridView = document.getElementById('grid-view'), albumView = document.getElementById('album-view');
@@ -245,7 +241,7 @@
         const albumArtWrapper = document.getElementById('album-art-wrapper');
         const playerBar = document.getElementById('player-bar');
         const playPauseBtn = document.getElementById('play-pause-btn'), playIcon = document.getElementById('play-icon'), pauseIcon = document.getElementById('pause-icon');
-        const waveformCanvas = document.getElementById('waveform-canvas');
+        const progressBar = document.getElementById('progress-bar'), progressBarContainer = document.getElementById('progress-bar-container');
         const stopBtn = document.getElementById('stop-btn');
         const nextBtn = document.getElementById('next-btn');
         const prevBtn = document.getElementById('prev-btn');
@@ -253,7 +249,6 @@
         
         // --- Firebase Setup ---
         async function initializeFirebase() {
-            // IMPORTANT: Replace with your actual Firebase configuration
             const firebaseConfig = { apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc", authDomain: "project-1-f9e5b.firebaseapp.com", projectId: "project-1-f9e5b", storageBucket: "project-1-f9e5b.appspot.com", messagingSenderId: "272340259942", appId: "1:272340259942:web:a5a5a302342e0b4eb389a7", measurementId: "G-EKL8BPFSG1" };
             if (!firebaseConfig.apiKey) {
                 document.body.innerHTML = `<div class="flex items-center justify-center h-screen text-center p-4"><div class="bg-red-900 border border-red-500 text-white p-6 rounded-lg"><h2 class="text-2xl font-bold mb-2">Error: Firebase Configuration Missing</h2><p>Please paste your Firebase config object into the 'initializeFirebase' function in the script.</p></div></div>`;
@@ -262,7 +257,6 @@
             const app = initializeApp(firebaseConfig);
             window.db = getFirestore(app);
             window.auth = getAuth(app);
-            window.storage = getStorage(app); // Initialize Cloud Storage
             onAuthStateChanged(auth, user => {
                 if (user) {
                     window.userId = user.uid;
@@ -304,7 +298,7 @@
                 albumView.classList.remove('hidden');
                 const coverImg = document.getElementById('album-view-cover');
                 coverImg.src = currentAlbum.data.imageUrl;
-                coverImg.onload = () => updateArtAndColors(currentAlbum.data.imageUrl);
+                coverImg.onload = () => updateAlbumArtGlow(currentAlbum.data.imageUrl);
                 document.getElementById('album-view-title').textContent = currentAlbum.data.title;
                 document.getElementById('album-view-artist').textContent = currentAlbum.data.artist;
                 listenForTracks(currentAlbum.id);
@@ -343,144 +337,39 @@
             });
         }
         
-        // --- Audio Player & Visualization Logic ---
-        function initializeAudioContext() {
-            if (isAudioContextInitialized) return;
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
-            sourceNode = audioContext.createMediaElementSource(audio);
-            sourceNode.connect(analyser);
-            analyser.connect(audioContext.destination);
-            analyser.fftSize = 256;
-            const bufferLength = analyser.frequencyBinCount;
-            dataArray = new Uint8Array(bufferLength);
-            isAudioContextInitialized = true;
-            visualize();
-        }
-
+        // --- Audio Player Logic ---
         function playTrack(index) {
             if (index < 0 || index >= currentPlaylist.length) return;
-            if (!isAudioContextInitialized) initializeAudioContext();
             currentTrackIndex = index;
             const track = currentPlaylist[index];
-            updateArtAndColors(track.albumArt); // Update colors for the new track
             audio.src = track.fileUrl;
             audio.play().catch(e => console.error("Error playing audio:", e));
             isPlaying = true;
             updatePlayerUI(track);
             updatePlayPauseIcon();
-            playerBar.classList.add('visible');
+            playerBar.classList.add('visible'); // Show player bar
         }
-
-        function visualize() {
-            requestAnimationFrame(visualize);
-            if (!isAudioContextInitialized || !dataArray) return;
-            
-            const canvasCtx = waveformCanvas.getContext('2d');
-            const WIDTH = waveformCanvas.width;
-            const HEIGHT = waveformCanvas.height;
-
-            analyser.getByteFrequencyData(dataArray);
-            
-            canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
-
-            const barWidth = (WIDTH / dataArray.length) * 1.5;
-            let x = 0;
-
-            const gradient = canvasCtx.createLinearGradient(0, 0, 0, HEIGHT);
-            gradient.addColorStop(0, currentVisualizerColors[0]);
-            gradient.addColorStop(1, currentVisualizerColors[1]);
-            canvasCtx.fillStyle = gradient;
-
-            for (let i = 0; i < dataArray.length; i++) {
-                const barHeight = dataArray[i] / 2.5; // Adjusted for better visual
-                canvasCtx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight);
-                x += barWidth + 1;
-            }
-            
-            // Draw progress overlay
-            if (audio.duration) {
-                const progress = audio.currentTime / audio.duration;
-                canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-                canvasCtx.fillRect(0, 0, WIDTH * progress, HEIGHT);
-            }
-        }
-
-        function togglePlayPause() { if (currentTrackIndex === -1) return; if (isPlaying) { audio.pause(); } else { audio.play(); if(!isAudioContextInitialized) initializeAudioContext(); } isPlaying = !isPlaying; updatePlayPauseIcon(); }
-        function stopPlayback() { audio.pause(); audio.currentTime = 0; isPlaying = false; updatePlayPauseIcon(); playerBar.classList.remove('visible'); }
+        function togglePlayPause() { if (currentTrackIndex === -1) return; if (isPlaying) { audio.pause(); } else { audio.play(); } isPlaying = !isPlaying; updatePlayPauseIcon(); }
+        function stopPlayback() { audio.pause(); audio.currentTime = 0; isPlaying = false; updatePlayPauseIcon(); playerBar.classList.remove('visible'); } // Hide player bar
         function playNext() { if (currentPlaylist.length === 0) return; let nextIndex = isShuffle ? Math.floor(Math.random() * currentPlaylist.length) : currentTrackIndex + 1; if (nextIndex >= currentPlaylist.length) nextIndex = 0; playTrack(nextIndex); }
         function playPrev() { if (currentPlaylist.length === 0) return; let prevIndex = currentTrackIndex - 1; if (prevIndex < 0) prevIndex = currentPlaylist.length - 1; playTrack(prevIndex); }
         function updatePlayerUI(track) { document.getElementById('player-album-art').src = track.albumArt; document.getElementById('player-track-title').textContent = track.fileName; document.getElementById('player-track-artist').textContent = track.artist; }
         function updatePlayPauseIcon() { playIcon.classList.toggle('hidden', isPlaying); pauseIcon.classList.toggle('hidden', !isPlaying); }
         function formatTime(seconds) { const minutes = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60); return `${minutes}:${secs < 10 ? '0' : ''}${secs}`; }
 
-        // --- Firestore & Storage Logic ---
+        // --- Firestore Logic ---
         function listenForItems() { if (window.itemsCollectionRef) { if (itemsUnsubscribe) itemsUnsubscribe(); const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId)); itemsUnsubscribe = onSnapshot(q, s => renderItems(s.docs.sort((a, b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for items:", e)); } }
         function listenForTracks(albumId) { if (window.itemsCollectionRef) { const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); if (tracksUnsubscribe) tracksUnsubscribe(); tracksUnsubscribe = onSnapshot(query(tracksRef), s => renderTracks(s.docs.sort((a,b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for tracks:", e)); } }
         async function createItem(type) { if (window.itemsCollectionRef) { const name = `New ${type} ${itemCount + 1}`; const data = { title: name, type, parentId: currentFolderId, createdAt: serverTimestamp() }; if (type === 'album') { data.artist = 'Untitled Artist'; data.imageUrl = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(name)}`; } await addDoc(itemsCollectionRef, data); } }
-        async function addTrack(albumId, file) {
-            if (!window.itemsCollectionRef || !window.userId) return;
-            const storageRef = ref(storage, `users/${userId}/tracks/${Date.now()}_${file.name}`);
-            try {
-                const snapshot = await uploadBytes(storageRef, file);
-                const downloadURL = await getDownloadURL(snapshot.ref);
-                const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
-                await addDoc(tracksRef, { fileName: file.name, fileUrl: downloadURL, createdAt: serverTimestamp() });
-            } catch (error) {
-                console.error("Error uploading file:", error);
-            }
-        }
+        async function addTrack(albumId, file) { if (!window.itemsCollectionRef) return; const fileUrl = URL.createObjectURL(file); const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); await addDoc(tracksRef, { fileName: file.name, fileUrl: fileUrl, createdAt: serverTimestamp() }); }
         async function removeTrack(albumId, trackId) { if (window.itemsCollectionRef) { await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId)); } }
         async function updateItem(id, data) { if(window.itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data); }
         async function deleteItem(id) { if(window.itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id)); }
 
-        // --- Album Art & Color Logic ---
+        // --- Album Art & Glow Logic ---
         albumArtWrapper.addEventListener('click', () => imageUpload.click());
-        imageUpload.addEventListener('change', async (e) => { 
-            const file = e.target.files[0]; 
-            if (file && currentAlbum && window.userId) {
-                // Show a temporary loader if you want
-                const storageRef = ref(storage, `users/${userId}/album_art/${currentAlbum.id}_${Date.now()}`);
-                try {
-                    const snapshot = await uploadBytes(storageRef, file);
-                    const downloadURL = await getDownloadURL(snapshot.ref);
-                    await updateItem(currentAlbum.id, { imageUrl: downloadURL });
-                    // Firestore listener will auto-update the UI, but we can force it for instant feedback
-                    document.getElementById('album-view-cover').src = downloadURL;
-                    updateArtAndColors(downloadURL);
-                } catch (error) {
-                    console.error("Error uploading new album art:", error);
-                    showConfirmation("Upload Failed", "Could not upload the new album art.", true);
-                }
-            }
-        });
-        
-        function updateArtAndColors(imageUrl) { 
-            const img = new Image(); 
-            img.crossOrigin = "Anonymous"; 
-            img.src = imageUrl; 
-            img.onload = () => { 
-                const canvas = document.createElement('canvas'); 
-                canvas.width = img.width; 
-                canvas.height = img.height; 
-                const ctx = canvas.getContext('2d'); 
-                ctx.drawImage(img, 0, 0); 
-                const topLeft = ctx.getImageData(0, 0, 1, 1).data; 
-                const bottomRight = ctx.getImageData(img.width - 1, img.height - 1, 1, 1).data; 
-                const color1 = `rgb(${topLeft[0]}, ${topLeft[1]}, ${topLeft[2]})`; 
-                const color2 = `rgb(${bottomRight[0]}, ${bottomRight[1]}, ${bottomRight[2]})`; 
-                // Update glow
-                document.querySelector('.album-art-glow').style.background = `linear-gradient(45deg, ${color1}, ${color2})`; 
-                // Update visualizer colors
-                currentVisualizerColors = [color1, color2];
-            }; 
-            img.onerror = () => {
-                // In case image fails to load, reset to default colors
-                const defaultColors = ['#5865F2', '#FFFFFF'];
-                document.querySelector('.album-art-glow').style.background = `linear-gradient(45deg, ${defaultColors[0]}, ${defaultColors[1]})`;
-                currentVisualizerColors = defaultColors;
-            }
-        }
+        imageUpload.addEventListener('change', (e) => { const file = e.target.files[0]; if (file && currentAlbum) { const reader = new FileReader(); reader.onload = (event) => { const newImageUrl = event.target.result; updateItem(currentAlbum.id, { imageUrl: newImageUrl }); document.getElementById('album-view-cover').src = newImageUrl; updateAlbumArtGlow(newImageUrl); }; reader.readAsDataURL(file); } });
+        function updateAlbumArtGlow(imageUrl) { const img = new Image(); img.crossOrigin = "Anonymous"; img.src = imageUrl; img.onload = () => { const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); const topLeft = ctx.getImageData(0, 0, 1, 1).data; const bottomRight = ctx.getImageData(img.width - 1, img.height - 1, 1, 1).data; const color1 = `rgba(${topLeft[0]}, ${topLeft[1]}, ${topLeft[2]}, 0.7)`; const color2 = `rgba(${bottomRight[0]}, ${bottomRight[1]}, ${bottomRight[2]}, 0.7)`; document.querySelector('.album-art-glow').style.background = `linear-gradient(45deg, ${color1}, ${color2})`; }; }
 
         // --- Gemini API Logic ---
         async function generateCoverArt() { const title = document.getElementById('edit-title').value; const artist = document.getElementById('edit-artist').value; if (!title || !artist) { showConfirmation("Missing Info", "Please enter a title and artist first.", true); return; } const spinner = document.getElementById('suggest-art-spinner'); const btnText = document.getElementById('suggest-art-text'); spinner.classList.remove('hidden'); btnText.classList.add('hidden'); suggestArtBtn.disabled = true; const prompt = `Album cover for a project titled '${title}' by the artist '${artist}'. Style: vibrant, abstract, digital art.`; const payload = { instances: [{ prompt }], parameters: { "sampleCount": 1 } }; const apiKey = ""; const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`; try { let response; let retries = 0; let delay = 1000; while (retries < 5) { response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); if (response.ok) break; if (response.status === 429 || response.status >= 500) { retries++; await new Promise(resolve => setTimeout(resolve, delay)); delay *= 2; } else { throw new Error(`API Error: ${response.statusText}`); } } if (!response || !response.ok) { throw new Error('Failed to generate image after several retries.'); } const result = await response.json(); if (result.predictions && result.predictions[0]?.bytesBase64Encoded) { const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`; document.getElementById('edit-image-url').value = imageUrl; } else { throw new Error("No image data in API response."); } } catch (error) { console.error("Error generating cover art:", error); showConfirmation("Generation Failed", "Sorry, couldn't generate cover art. Please try again.", true); } finally { spinner.classList.add('hidden'); btnText.classList.remove('hidden'); suggestArtBtn.disabled = false; } }
@@ -506,9 +395,10 @@
         nextBtn.addEventListener('click', playNext);
         prevBtn.addEventListener('click', playPrev);
         shuffleBtn.addEventListener('click', () => { isShuffle = !isShuffle; shuffleBtn.classList.toggle('text-green-500', isShuffle); });
-        audio.addEventListener('timeupdate', () => { if (audio.duration) { document.getElementById('current-time').textContent = formatTime(audio.currentTime); document.getElementById('total-time').textContent = formatTime(audio.duration); } });
+        audio.addEventListener('timeupdate', () => { if (audio.duration) { const percent = (audio.currentTime / audio.duration) * 100; progressBar.style.width = `${percent}%`; document.getElementById('current-time').textContent = formatTime(audio.currentTime); } });
+        audio.addEventListener('loadedmetadata', () => { document.getElementById('total-time').textContent = formatTime(audio.duration); });
         audio.addEventListener('ended', playNext);
-        waveformCanvas.addEventListener('click', (e) => { if (!audio.duration) return; const rect = waveformCanvas.getBoundingClientRect(); const percent = (e.clientX - rect.left) / rect.width; audio.currentTime = percent * audio.duration; });
+        progressBarContainer.addEventListener('click', (e) => { if (!audio.duration) return; const rect = progressBarContainer.getBoundingClientRect(); const percent = (e.clientX - rect.left) / rect.width; audio.currentTime = percent * audio.duration; });
         document.getElementById('add-album-btn').addEventListener('click', e => { e.preventDefault(); createItem('album'); hideAllContextMenus(); });
         document.getElementById('add-folder-btn').addEventListener('click', e => { e.preventDefault(); createItem('folder'); hideAllContextMenus(); });
         document.getElementById('rename-btn').addEventListener('click', e => { e.preventDefault(); document.getElementById('rename-input').value = contextTarget.data.title; showModal(renameModal); hideAllContextMenus(); });
