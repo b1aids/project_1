@@ -96,7 +96,7 @@
                     </button>
                     <div class="flex items-center gap-3">
                         <!-- Image Logo -->
-                        <img src="https://placehold.co/32x32/5865F2/FFFFFF?text=P1" alt="Logo" class="h-6 w-6 rounded">
+                        <img id="logo-button" src="https://placehold.co/32x32/5865F2/FFFFFF?text=P1" alt="Logo" class="h-6 w-6 rounded cursor-pointer">
                         <h1 id="header-title" class="text-xl font-bold text-white">project_1</h1>
                     </div>
                 </div>
@@ -311,6 +311,7 @@
         const userProfileDiv = document.getElementById('user-profile');
         const loadingIndicator = document.getElementById('loading-indicator');
         const dropMessage = document.getElementById('drop-message');
+        const logoButton = document.getElementById('logo-button');
         
         // --- Firebase Setup ---
         async function initializeFirebase() {
@@ -796,6 +797,7 @@
 
         document.getElementById('grid-view').addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); if (auth.currentUser) showContextMenu(contextMenuBg, e.clientX, e.clientY); });
         backButton.addEventListener('click', navigateBack);
+        logoButton.addEventListener('click', () => { location.hash = 'folder/root'; });
         
         // --- Upload Listeners ---
         dropZone.addEventListener('click', () => {
