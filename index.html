@@ -325,14 +325,14 @@
         // --- Firebase Setup ---
         async function initializeFirebase() {
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const firebaseConfig = { 
-                apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc", 
-                authDomain: "project-1-f9e5b.firebaseapp.com", 
-                projectId: "project-1-f9e5b", 
-                storageBucket: "project-1-f9e5b.appspot.com", 
-                messagingSenderId: "272340259942", 
-                appId: "1:272340259942:web:a5a5a302342e0b4eb389a7", 
-                measurementId: "G-EKL8BPFSG1" 
+            const firebaseConfig = {
+                apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc",
+                authDomain: "project-1-f9e5b.firebaseapp.com",
+                projectId: "project-1-f9e5b",
+                storageBucket: "project-1-f9e5b.firebasestorage.app",
+                messagingSenderId: "272340259942",
+                appId: "1:272340259942:web:a5a5a302342e0b4eb389a7",
+                measurementId: "G-EKL8BPFSG1"
             };
             if (!firebaseConfig.apiKey) {
                 document.body.innerHTML = `<div class="flex items-center justify-center h-screen text-center p-4"><div class="bg-red-900 border border-red-500 text-white p-6 rounded-lg"><h2 class="text-2xl font-bold mb-2">Error: Firebase Configuration Missing</h2><p>Please paste your Firebase config object into the 'initializeFirebase' function in the script.</p></div></div>`;
