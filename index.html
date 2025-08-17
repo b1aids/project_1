@@ -224,15 +224,15 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- State Management ---
         let currentView = 'grid', currentFolderId = 'root', currentAlbum = null;
-        let navigationStack = [{id: 'root', title: 'project_1', type: 'folder'}];
         let contextTarget = null, trackContextTarget = null;
         let itemCount = 0;
         let tracksUnsubscribe = null, itemsUnsubscribe = null;
+        let currentItemDocs = []; // To store current items for duplicate checks
         
         // --- Player State ---
         const audio = new Audio();
@@ -303,26 +303,42 @@
             }
         }
         
-        // --- Navigation & View Management ---
-        function navigateTo(folderId, folderTitle) { 
-            navigationStack.push({id: folderId, title: folderTitle, type: 'folder'});
-            history.pushState({ view: 'grid', folderId, folderTitle }, folderTitle, `./folder/${folderId}`); 
-            currentFolderId = folderId; 
-            updateView('grid'); 
+        // --- Navigation & View Management (Hash-based) ---
+        function navigateTo(folderId) { 
+            location.hash = `folder/${folderId}`;
         }
 
         function navigateBack() { 
-            if (currentView === 'album' || navigationStack.length > 1) { 
-                history.back(); 
-            } 
+            history.back();
         }
 
         function showAlbumView(album) { 
-            currentAlbum = album; 
-            const albumUrl = `./album/${encodeURIComponent(album.data.title.replace(/\s+/g, '-'))}`; 
-            navigationStack.push({id: album.id, title: album.data.title, type: 'album'});
-            history.pushState({ view: 'album', albumId: album.id, folderId: currentFolderId }, album.data.title, albumUrl); 
-            updateView('album'); 
+            location.hash = `album/${album.id}`;
+        }
+
+        async function handleHashChange() {
+            const hash = location.hash.substring(1);
+            const [type, id] = hash.split('/');
+
+            if (type === 'folder' && id) {
+                currentFolderId = id;
+                updateView('grid');
+            } else if (type === 'album' && id) {
+                // We need to fetch the album data since it's not in the hash
+                const albumDocRef = doc(db, itemsCollectionRef.path, id);
+                const albumDoc = await getDoc(albumDocRef);
+                if (albumDoc.exists()) {
+                    currentAlbum = { id: albumDoc.id, data: albumDoc.data() };
+                    currentFolderId = currentAlbum.data.parentId; // Set parent folder context
+                    updateView('album');
+                } else {
+                    console.error("Album not found, redirecting to root.");
+                    location.hash = 'folder/root';
+                }
+            } else {
+                currentFolderId = 'root';
+                updateView('grid');
+            }
         }
 
         function updateView(view) {
@@ -330,17 +346,15 @@
             if (itemsUnsubscribe) { itemsUnsubscribe(); itemsUnsubscribe = null; }
             if (tracksUnsubscribe) { tracksUnsubscribe(); tracksUnsubscribe = null; }
             
+            backButton.style.display = (currentFolderId !== 'root' || view === 'album') ? 'flex' : 'none';
+
             if (view === 'grid') {
-                const currentFolder = navigationStack[navigationStack.length - 1];
-                currentFolderId = currentFolder.id;
-                headerTitle.textContent = currentFolder.title;
-                backButton.style.display = navigationStack.length > 1 ? 'flex' : 'none';
+                headerTitle.textContent = currentFolderId === 'root' ? 'project_1' : '...'; // Placeholder, will be updated by listener
                 gridView.classList.remove('hidden');
                 albumView.classList.add('hidden');
                 listenForItems();
             } else if (view === 'album') {
                 headerTitle.textContent = currentAlbum.data.title;
-                backButton.style.display = 'flex';
                 gridView.classList.add('hidden');
                 albumView.classList.remove('hidden');
                 const coverImg = document.getElementById('album-view-cover');
@@ -354,15 +368,23 @@
 
         // --- Data Rendering ---
         function renderItems(docs) {
+            currentItemDocs = docs.map(doc => ({ id: doc.id, data: doc.data() })); // Cache for duplicate checks
             itemGrid.innerHTML = '';
             itemCount = docs.length;
             if (docs.length === 0) { itemGrid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10">Right-click to add your first album or folder.</div>`; }
-            docs.forEach(doc => {
-                const item = { id: doc.id, data: doc.data() };
+            
+            // Update folder title if we are in a subfolder
+            if (currentFolderId !== 'root') {
+                 getDoc(doc(db, itemsCollectionRef.path, currentFolderId)).then(docSnap => {
+                     if(docSnap.exists()) headerTitle.textContent = docSnap.data().title;
+                 });
+            }
+
+            currentItemDocs.forEach(item => {
                 const el = document.createElement('div');
                 el.className = 'w-full space-y-2 cursor-pointer group item-fade-in';
                 el.innerHTML = item.data.type === 'album' ? `<div class="relative aspect-square"><img src="${item.data.imageUrl}" class="w-full h-full object-cover rounded-lg shadow-lg group-hover:scale-105 transition-transform" onerror="this.src='https://placehold.co/200x200/333/fff?text=Error';"></div><div class="text-white"><h3 class="font-bold truncate">${item.data.title}</h3><p class="text-sm text-gray-400 truncate">${item.data.artist}</p></div>` : `<div class="relative aspect-square w-full h-full rounded-lg shadow-lg bg-gray-800 flex items-center justify-center group-hover:scale-105 transition-transform"><svg class="h-1/2 w-1/2 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg></div><div class="text-white"><h3 class="font-bold truncate">${item.data.title}</h3><p class="text-sm text-gray-400">Folder</p></div>`;
-                el.addEventListener('click', () => item.data.type === 'folder' ? navigateTo(item.id, item.data.title) : showAlbumView(item));
+                el.addEventListener('click', () => item.data.type === 'folder' ? navigateTo(item.id) : showAlbumView(item));
                 el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); contextTarget = item; showContextMenu(contextMenuItem, e.clientX, e.clientY); });
                 itemGrid.appendChild(el);
             });
@@ -453,7 +475,27 @@
         // --- Firestore & Storage Logic ---
         function listenForItems() { if (window.itemsCollectionRef) { if (itemsUnsubscribe) itemsUnsubscribe(); const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId)); itemsUnsubscribe = onSnapshot(q, s => renderItems(s.docs.sort((a, b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for items:", e)); } }
         function listenForTracks(albumId) { if (window.itemsCollectionRef) { const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); if (tracksUnsubscribe) tracksUnsubscribe(); tracksUnsubscribe = onSnapshot(query(tracksRef), s => renderTracks(s.docs.sort((a,b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for tracks:", e)); } }
-        async function createItem(type) { if (window.itemsCollectionRef) { const name = `New ${type} ${itemCount + 1}`; const data = { title: name, type, parentId: currentFolderId, createdAt: serverTimestamp() }; if (type === 'album') { data.artist = 'Untitled Artist'; data.imageUrl = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(name)}`; } await addDoc(itemsCollectionRef, data); } }
+        
+        async function createItem(type) { 
+            if (!window.itemsCollectionRef) return;
+            
+            let name = `New ${type}`;
+            let counter = 1;
+            let finalName = `${name} ${counter}`;
+            const existingTitles = currentItemDocs.map(item => item.data.title.toLowerCase());
+
+            while (existingTitles.includes(finalName.toLowerCase())) {
+                counter++;
+                finalName = `${name} ${counter}`;
+            }
+
+            const data = { title: finalName, type, parentId: currentFolderId, createdAt: serverTimestamp() }; 
+            if (type === 'album') { 
+                data.artist = 'Untitled Artist'; 
+                data.imageUrl = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(finalName)}`; 
+            } 
+            await addDoc(itemsCollectionRef, data); 
+        }
         
         async function addTrack(albumId, file) {
             if (!window.itemsCollectionRef || !window.userId) return;
@@ -500,8 +542,6 @@
         // --- State Persistence ---
         function saveState() {
             const state = {
-                navigationStack: navigationStack,
-                currentAlbum: currentAlbum ? { id: currentAlbum.id, data: currentAlbum.data } : null,
                 player: currentTrackIndex > -1 ? {
                     playlist: currentPlaylist,
                     trackIndex: currentTrackIndex,
@@ -512,19 +552,7 @@
         }
 
         // --- Event Listeners ---
-        window.addEventListener('popstate', (event) => {
-            if (event.state) {
-                const lastState = navigationStack[navigationStack.length - 1];
-                if (lastState && lastState.id !== event.state.folderId && lastState.id !== event.state.albumId) {
-                    navigationStack.pop();
-                }
-                updateView('grid');
-            } else {
-                navigationStack = [{id: 'root', title: 'project_1', type: 'folder'}];
-                updateView('grid');
-            }
-        });
-
+        window.addEventListener('hashchange', handleHashChange);
         window.addEventListener('beforeunload', saveState);
 
         document.getElementById('grid-view').addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showContextMenu(contextMenuBg, e.clientX, e.clientY); });
@@ -576,7 +604,25 @@
         document.getElementById('delete-btn').addEventListener('click', async e => { e.preventDefault(); hideAllContextMenus(); const confirmed = await showConfirmation('Delete Item?', `You are about to delete "${contextTarget.data.title}". This cannot be undone.`); if (confirmed) { deleteItem(contextTarget.id); } });
         document.getElementById('track-remove-btn').addEventListener('click', e => { e.preventDefault(); if (trackContextTarget) { removeTrack(currentAlbum.id, trackContextTarget.id); } hideAllContextMenus(); });
         suggestArtBtn.addEventListener('click', generateCoverArt);
-        document.getElementById('rename-form').addEventListener('submit', e => { e.preventDefault(); const newTitle = document.getElementById('rename-input').value; if (newTitle) updateItem(contextTarget.id, { title: newTitle }); hideModal(renameModal); });
+        
+        document.getElementById('rename-form').addEventListener('submit', e => { 
+            e.preventDefault(); 
+            const newTitle = document.getElementById('rename-input').value.trim();
+            if (!newTitle) return;
+
+            const isDuplicate = currentItemDocs.some(item =>
+                item.id !== contextTarget.id && item.data.title.toLowerCase() === newTitle.toLowerCase()
+            );
+
+            if (isDuplicate) {
+                showConfirmation("Duplicate Name", "An item with this name already exists in this folder.", true);
+                return;
+            }
+
+            if (newTitle) updateItem(contextTarget.id, { title: newTitle }); 
+            hideModal(renameModal); 
+        });
+
         document.getElementById('edit-form').addEventListener('submit', e => { e.preventDefault(); const newData = { title: document.getElementById('edit-title').value, artist: document.getElementById('edit-artist').value, imageUrl: document.getElementById('edit-image-url').value }; if (newData.title && newData.artist && newData.imageUrl) updateItem(contextTarget.id, newData); hideModal(editModal); });
         document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => { hideModal(renameModal); hideModal(editModal); }));
         document.getElementById('confirm-cancel-btn').addEventListener('click', () => hideModal(confirmModal));
@@ -587,15 +633,7 @@
             if (savedStateJSON) {
                 try {
                     const savedState = JSON.parse(savedStateJSON);
-
-                    // Restore navigation and view state first
-                    if (savedState.navigationStack) {
-                        navigationStack = savedState.navigationStack;
-                    }
                     
-                    const lastNav = navigationStack[navigationStack.length - 1];
-                    
-                    // Restore player state if available
                     if (savedState.player) {
                         currentPlaylist = savedState.player.playlist;
                         currentTrackIndex = savedState.player.trackIndex;
@@ -604,7 +642,6 @@
                         audio.src = track.fileUrl;
                         audio.addEventListener('loadedmetadata', () => {
                             audio.currentTime = savedState.player.currentTime;
-                            // Update time display and progress bar after setting time
                             if (audio.duration) {
                                 currentTimeEl.textContent = formatTime(audio.currentTime);
                                 totalTimeEl.textContent = formatTime(audio.duration);
@@ -615,29 +652,16 @@
 
                         updatePlayerUI(track);
                         playerBar.classList.add('visible');
-                        updatePlayPauseIcon(); // Show paused state
+                        updatePlayPauseIcon();
                     }
-
-                    // Restore the correct view
-                    if (lastNav.type === 'album' && savedState.currentAlbum) {
-                        currentAlbum = savedState.currentAlbum;
-                        history.replaceState({ view: 'album', albumId: currentAlbum.id, folderId: currentFolderId }, currentAlbum.data.title, location.pathname);
-                        updateView('album');
-                    } else {
-                        history.replaceState({ view: 'grid', folderId: lastNav.id, title: lastNav.title }, lastNav.title, location.pathname);
-                        updateView('grid');
-                    }
-                    return; // Exit after loading state
-
                 } catch (error) {
-                    console.error("Failed to restore state:", error);
+                    console.error("Failed to restore player state:", error);
                     localStorage.removeItem('project1_state');
                 }
             }
-
-            // Default initialization if no state or failed to load
-            history.replaceState({ view: 'grid', folderId: 'root', title: 'project_1' }, 'project_1', './');
-            updateView('grid');
+            
+            // Handle initial navigation based on hash
+            handleHashChange();
         }
 
         initializeFirebase();
