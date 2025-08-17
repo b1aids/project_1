@@ -260,7 +260,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
@@ -285,13 +285,13 @@
         let gapiLoaded = false;
         let gisLoaded = false;
         let tokenClient;
-        const CLIENT_ID = '272340259942-5373s4d41405sou465aukk7l5r9mnf43.apps.googleusercontent.com'; // Replace with your client ID
+        const CLIENT_ID = 'YOUR_GOOGLE_DRIVE_API_CLIENT_ID'; // Replace with your client ID
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
         
         // --- Discord API State ---
-        const DISCORD_CLIENT_ID = '1357477637072879776'; // Replace with your Discord Client ID
+        const DISCORD_CLIENT_ID = 'YOUR_DISCORD_CLIENT_ID'; // Replace with your Discord Client ID
         const DISCORD_SCOPES = ['identify', 'guilds'];
-        const DISCORD_REDIRECT_URI = 'https://project-1-7aa.pages.dev/auth/discord/callback'; // Replace with your redirect URI
+        const DISCORD_REDIRECT_URI = 'https://example.com/auth/discord/callback'; // Replace with your redirect URI
 
         // --- DOM Elements ---
         const gridView = document.getElementById('grid-view'), albumView = document.getElementById('album-view');
@@ -320,7 +320,7 @@
         const connectDriveBtn = document.getElementById('connect-drive-btn');
         const discordConnectStatus = document.getElementById('discord-connect-status');
         const connectDiscordBtn = document.getElementById('connect-discord-btn');
-        
+
         // --- Firebase Setup ---
         async function initializeFirebase() {
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -341,7 +341,7 @@
             window.db = getFirestore(app);
             window.auth = getAuth(app);
             window.storage = getStorage(app);
-            
+
             // onAuthStateChanged is the central place to handle user state.
             onAuthStateChanged(auth, user => {
                 if (user) {
@@ -462,7 +462,77 @@
             }
         }
         
-        // --- Google Drive/Discord placeholders removed for clarity ---
+        // --- Google Drive Integration ---
+        // This is a placeholder since the full OAuth flow cannot be done in this environment.
+        // The code simulates a connection/disconnection.
+        let isDriveConnected = false;
+        
+        function updateDriveUI() {
+            const connectDriveBtn = document.getElementById('connect-drive-btn');
+            if (isDriveConnected) {
+                connectDriveBtn.textContent = 'Disconnect';
+                connectDriveBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                connectDriveBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                connectDriveBtn.textContent = 'Connect';
+                connectDriveBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                connectDriveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }
+        }
+        
+        async function handleDriveAuthClick() {
+            if (isDriveConnected) {
+                const confirmed = await showConfirmation('Disconnect Google Drive?', 'Are you sure you want to disconnect from Google Drive?', false);
+                if (confirmed) {
+                    isDriveConnected = false;
+                    updateDriveUI();
+                    console.log('Simulated Google Drive token revocation.');
+                }
+            } else {
+                const confirmed = await showConfirmation('Connect Google Drive?', 'This will open a new window to authorize with Google Drive.', true);
+                if (confirmed) {
+                    isDriveConnected = true;
+                    updateDriveUI();
+                    console.log('Simulated Google Drive connection.');
+                }
+            }
+        }
+        
+        // --- Discord Integration ---
+        let isDiscordConnected = false;
+        
+        function updateDiscordUI() {
+            const connectDiscordBtn = document.getElementById('connect-discord-btn');
+            if (isDiscordConnected) {
+                connectDiscordBtn.textContent = 'Disconnect';
+                connectDiscordBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                connectDiscordBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                connectDiscordBtn.textContent = 'Connect';
+                connectDiscordBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                connectDiscordBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }
+        }
+
+        async function handleDiscordAuthClick() {
+            if (isDiscordConnected) {
+                // Simulate token revocation
+                const confirmed = await showConfirmation('Disconnect Discord?', 'Are you sure you want to disconnect from Discord?', false);
+                if (confirmed) {
+                    isDiscordConnected = false;
+                    updateDiscordUI();
+                    console.log('Simulated Discord token revocation.');
+                }
+            } else {
+                // Simulate OAuth flow
+                const confirmed = await showConfirmation('Connect Discord?', 'This will open a new window to authorize with Discord.', true);
+                if (confirmed) {
+                    isDiscordConnected = true;
+                    updateDiscordUI();
+                    console.log('Simulated Discord connection.');
+                }
+            }
+        }
 
         // --- Navigation & View Management (Hash-based) ---
         function navigateTo(folderId) { 
@@ -745,9 +815,14 @@
             hideAllContextMenus();
           }
         }
-        function hideAllContextMenus() { document.removeEventListener('mousedown', handleOutsideClick, { capture: true }); [contextMenuBg, contextMenuItem, contextMenuTrack].forEach(m => { if (!m.classList.contains('hidden')) { m.classList.add('opacity-0', 'scale-95'); setTimeout(() => m.classList.add('hidden'), 200); } }); }
-        function showModal(modal) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
-        function hideModal(modal) { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); document.removeEventListener('mousedown', handleOutsideClick, { capture: true });}
+        function hideAllContextMenus() { [contextMenuBg, contextMenuItem, contextMenuTrack].forEach(m => { if (!m.classList.contains('hidden')) { m.classList.add('opacity-0', 'scale-95'); setTimeout(() => m.classList.add('hidden'), 200); } }); }
+        function showModal(modal) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); document.addEventListener('mousedown', (e) => { 
+            // Only add a listener if a modal is actually open
+            if (!e.target.closest('.modal')) {
+                hideModal(modal);
+            }
+        });}
+        function hideModal(modal) { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200);}
         function showConfirmation(title, message, isAlert = false) { return new Promise((resolve) => { const confirmTitle = document.getElementById('confirm-title'), confirmMessage = document.getElementById('confirm-message'), okBtn = document.getElementById('confirm-ok-btn'), cancelBtn = document.getElementById('confirm-cancel-btn'); confirmTitle.textContent = title; confirmMessage.textContent = message; if(isAlert) { okBtn.textContent = 'OK'; okBtn.className = 'py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors'; cancelBtn.classList.add('hidden'); } else { okBtn.textContent = 'Delete'; okBtn.className = 'py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors'; cancelBtn.classList.remove('hidden'); } showModal(confirmModal); const okHandler = () => { hideModal(confirmModal); resolve(true); cleanup(); }; const cancelHandler = () => { hideModal(confirmModal); resolve(false); cleanup(); }; function cleanup() { okBtn.removeEventListener('click', okHandler); cancelBtn.removeEventListener('click', cancelHandler); } okBtn.addEventListener('click', okHandler, { once: true }); cancelBtn.addEventListener('click', cancelHandler, { once: true }); }); }
 
         // --- State Persistence ---
@@ -868,6 +943,80 @@
         document.getElementById('confirm-cancel-btn').addEventListener('click', () => hideModal(confirmModal));
         const settingsCloseBtn = document.getElementById('settings-close-btn');
         settingsCloseBtn.addEventListener('click', () => hideModal(settingsModal));
+
+        // --- Google Drive Integration (Re-enabled) ---
+        let isDriveConnected = false;
+        
+        function updateDriveUI() {
+            const connectDriveBtn = document.getElementById('connect-drive-btn');
+            if (isDriveConnected) {
+                connectDriveBtn.textContent = 'Disconnect';
+                connectDriveBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                connectDriveBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                connectDriveBtn.textContent = 'Connect';
+                connectDriveBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                connectDriveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }
+        }
+        
+        function handleDriveAuthClick() {
+            if (isDriveConnected) {
+                // Simulate token revocation
+                isDriveConnected = false;
+                updateDriveUI();
+                hideModal(settingsModal); // Close the settings modal after disconnecting
+                showConfirmation("Google Drive Disconnected", "You have been disconnected from Google Drive.", true);
+            } else {
+                // Simulate OAuth flow
+                // In a real app, this would redirect to Google's auth page.
+                isDriveConnected = true;
+                updateDriveUI();
+                hideModal(settingsModal); // Close the settings modal after connecting
+                showConfirmation("Google Drive Connected", "You have successfully connected to Google Drive!", true);
+            }
+        }
+        
+        connectDriveBtn.addEventListener('click', handleDriveAuthClick);
+
+
+        // --- Discord Integration (Simulated) ---
+        let isDiscordConnected = false;
+        
+        function updateDiscordUI() {
+            const connectDiscordBtn = document.getElementById('connect-discord-btn');
+            if (isDiscordConnected) {
+                connectDiscordBtn.textContent = 'Disconnect';
+                connectDiscordBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                connectDiscordBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                connectDiscordBtn.textContent = 'Connect';
+                connectDiscordBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                connectDiscordBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }
+        }
+
+        async function handleDiscordAuthClick() {
+            if (isDiscordConnected) {
+                // Simulate token revocation
+                const confirmed = await showConfirmation('Disconnect Discord?', 'Are you sure you want to disconnect from Discord?', false);
+                if (confirmed) {
+                    isDiscordConnected = false;
+                    updateDiscordUI();
+                    console.log('Simulated Discord token revocation.');
+                }
+            } else {
+                // Simulate OAuth flow
+                const confirmed = await showConfirmation('Connect Discord?', 'This will open a new window to authorize with Discord.', true);
+                if (confirmed) {
+                    isDiscordConnected = true;
+                    updateDiscordUI();
+                    console.log('Simulated Discord connection.');
+                }
+            }
+        }
+        
+        connectDiscordBtn.addEventListener('click', handleDiscordAuthClick);
 
         // --- Initialize ---
         function initializeAppState() {
