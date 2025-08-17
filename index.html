@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project_1</title>
     <!-- Favicon for the site -->
-    <link rel="icon" type="image/png" href="./img/logo.png">
+    <link rel="icon" type="image/png" href="https://placehold.co/32x32/5865F2/FFFFFF?text=P1">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -103,7 +103,7 @@
                     </button>
                     <div class="flex items-center gap-3">
                         <!-- Image Logo -->
-                        <img src="./img/logo.png" alt="Logo" class="h-6 w-6">
+                        <img src="https://placehold.co/32x32/5865F2/FFFFFF?text=P1" alt="Logo" class="h-6 w-6 rounded">
                         <h1 id="header-title" class="text-xl font-bold text-white">project_1</h1>
                     </div>
                 </div>
@@ -231,6 +231,7 @@
         // --- Web Audio API for Visualization ---
         let audioContext, analyser, sourceNode, dataArray;
         let isAudioContextInitialized = false;
+        let currentVisualizerColors = ['#5865F2', '#FFFFFF']; // Default colors
 
         // --- DOM Elements ---
         const gridView = document.getElementById('grid-view'), albumView = document.getElementById('album-view');
@@ -252,6 +253,7 @@
         
         // --- Firebase Setup ---
         async function initializeFirebase() {
+            // IMPORTANT: Replace with your actual Firebase configuration
             const firebaseConfig = { apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc", authDomain: "project-1-f9e5b.firebaseapp.com", projectId: "project-1-f9e5b", storageBucket: "project-1-f9e5b.appspot.com", messagingSenderId: "272340259942", appId: "1:272340259942:web:a5a5a302342e0b4eb389a7", measurementId: "G-EKL8BPFSG1" };
             if (!firebaseConfig.apiKey) {
                 document.body.innerHTML = `<div class="flex items-center justify-center h-screen text-center p-4"><div class="bg-red-900 border border-red-500 text-white p-6 rounded-lg"><h2 class="text-2xl font-bold mb-2">Error: Firebase Configuration Missing</h2><p>Please paste your Firebase config object into the 'initializeFirebase' function in the script.</p></div></div>`;
@@ -302,7 +304,7 @@
                 albumView.classList.remove('hidden');
                 const coverImg = document.getElementById('album-view-cover');
                 coverImg.src = currentAlbum.data.imageUrl;
-                coverImg.onload = () => updateAlbumArtGlow(currentAlbum.data.imageUrl);
+                coverImg.onload = () => updateArtAndColors(currentAlbum.data.imageUrl);
                 document.getElementById('album-view-title').textContent = currentAlbum.data.title;
                 document.getElementById('album-view-artist').textContent = currentAlbum.data.artist;
                 listenForTracks(currentAlbum.id);
@@ -361,6 +363,7 @@
             if (!isAudioContextInitialized) initializeAudioContext();
             currentTrackIndex = index;
             const track = currentPlaylist[index];
+            updateArtAndColors(track.albumArt); // Update colors for the new track
             audio.src = track.fileUrl;
             audio.play().catch(e => console.error("Error playing audio:", e));
             isPlaying = true;
@@ -370,6 +373,9 @@
         }
 
         function visualize() {
+            requestAnimationFrame(visualize);
+            if (!isAudioContextInitialized || !dataArray) return;
+            
             const canvasCtx = waveformCanvas.getContext('2d');
             const WIDTH = waveformCanvas.width;
             const HEIGHT = waveformCanvas.height;
@@ -381,15 +387,13 @@
             const barWidth = (WIDTH / dataArray.length) * 1.5;
             let x = 0;
 
-            // Create a fiery gradient
             const gradient = canvasCtx.createLinearGradient(0, 0, 0, HEIGHT);
-            gradient.addColorStop(0, 'red');
-            gradient.addColorStop(0.5, 'orange');
-            gradient.addColorStop(1, 'yellow');
+            gradient.addColorStop(0, currentVisualizerColors[0]);
+            gradient.addColorStop(1, currentVisualizerColors[1]);
             canvasCtx.fillStyle = gradient;
 
             for (let i = 0; i < dataArray.length; i++) {
-                const barHeight = dataArray[i] / 2;
+                const barHeight = dataArray[i] / 2.5; // Adjusted for better visual
                 canvasCtx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight);
                 x += barWidth + 1;
             }
@@ -400,8 +404,6 @@
                 canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
                 canvasCtx.fillRect(0, 0, WIDTH * progress, HEIGHT);
             }
-
-            requestAnimationFrame(visualize);
         }
 
         function togglePlayPause() { if (currentTrackIndex === -1) return; if (isPlaying) { audio.pause(); } else { audio.play(); if(!isAudioContextInitialized) initializeAudioContext(); } isPlaying = !isPlaying; updatePlayPauseIcon(); }
@@ -432,10 +434,53 @@
         async function updateItem(id, data) { if(window.itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data); }
         async function deleteItem(id) { if(window.itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id)); }
 
-        // --- Album Art & Glow Logic ---
+        // --- Album Art & Color Logic ---
         albumArtWrapper.addEventListener('click', () => imageUpload.click());
-        imageUpload.addEventListener('change', (e) => { const file = e.target.files[0]; if (file && currentAlbum) { const reader = new FileReader(); reader.onload = (event) => { const newImageUrl = event.target.result; updateItem(currentAlbum.id, { imageUrl: newImageUrl }); document.getElementById('album-view-cover').src = newImageUrl; updateAlbumArtGlow(newImageUrl); }; reader.readAsDataURL(file); } });
-        function updateAlbumArtGlow(imageUrl) { const img = new Image(); img.crossOrigin = "Anonymous"; img.src = imageUrl; img.onload = () => { const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); const topLeft = ctx.getImageData(0, 0, 1, 1).data; const bottomRight = ctx.getImageData(img.width - 1, img.height - 1, 1, 1).data; const color1 = `rgba(${topLeft[0]}, ${topLeft[1]}, ${topLeft[2]}, 0.7)`; const color2 = `rgba(${bottomRight[0]}, ${bottomRight[1]}, ${bottomRight[2]}, 0.7)`; document.querySelector('.album-art-glow').style.background = `linear-gradient(45deg, ${color1}, ${color2})`; }; }
+        imageUpload.addEventListener('change', async (e) => { 
+            const file = e.target.files[0]; 
+            if (file && currentAlbum && window.userId) {
+                // Show a temporary loader if you want
+                const storageRef = ref(storage, `users/${userId}/album_art/${currentAlbum.id}_${Date.now()}`);
+                try {
+                    const snapshot = await uploadBytes(storageRef, file);
+                    const downloadURL = await getDownloadURL(snapshot.ref);
+                    await updateItem(currentAlbum.id, { imageUrl: downloadURL });
+                    // Firestore listener will auto-update the UI, but we can force it for instant feedback
+                    document.getElementById('album-view-cover').src = downloadURL;
+                    updateArtAndColors(downloadURL);
+                } catch (error) {
+                    console.error("Error uploading new album art:", error);
+                    showConfirmation("Upload Failed", "Could not upload the new album art.", true);
+                }
+            }
+        });
+        
+        function updateArtAndColors(imageUrl) { 
+            const img = new Image(); 
+            img.crossOrigin = "Anonymous"; 
+            img.src = imageUrl; 
+            img.onload = () => { 
+                const canvas = document.createElement('canvas'); 
+                canvas.width = img.width; 
+                canvas.height = img.height; 
+                const ctx = canvas.getContext('2d'); 
+                ctx.drawImage(img, 0, 0); 
+                const topLeft = ctx.getImageData(0, 0, 1, 1).data; 
+                const bottomRight = ctx.getImageData(img.width - 1, img.height - 1, 1, 1).data; 
+                const color1 = `rgb(${topLeft[0]}, ${topLeft[1]}, ${topLeft[2]})`; 
+                const color2 = `rgb(${bottomRight[0]}, ${bottomRight[1]}, ${bottomRight[2]})`; 
+                // Update glow
+                document.querySelector('.album-art-glow').style.background = `linear-gradient(45deg, ${color1}, ${color2})`; 
+                // Update visualizer colors
+                currentVisualizerColors = [color1, color2];
+            }; 
+            img.onerror = () => {
+                // In case image fails to load, reset to default colors
+                const defaultColors = ['#5865F2', '#FFFFFF'];
+                document.querySelector('.album-art-glow').style.background = `linear-gradient(45deg, ${defaultColors[0]}, ${defaultColors[1]})`;
+                currentVisualizerColors = defaultColors;
+            }
+        }
 
         // --- Gemini API Logic ---
         async function generateCoverArt() { const title = document.getElementById('edit-title').value; const artist = document.getElementById('edit-artist').value; if (!title || !artist) { showConfirmation("Missing Info", "Please enter a title and artist first.", true); return; } const spinner = document.getElementById('suggest-art-spinner'); const btnText = document.getElementById('suggest-art-text'); spinner.classList.remove('hidden'); btnText.classList.add('hidden'); suggestArtBtn.disabled = true; const prompt = `Album cover for a project titled '${title}' by the artist '${artist}'. Style: vibrant, abstract, digital art.`; const payload = { instances: [{ prompt }], parameters: { "sampleCount": 1 } }; const apiKey = ""; const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`; try { let response; let retries = 0; let delay = 1000; while (retries < 5) { response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); if (response.ok) break; if (response.status === 429 || response.status >= 500) { retries++; await new Promise(resolve => setTimeout(resolve, delay)); delay *= 2; } else { throw new Error(`API Error: ${response.statusText}`); } } if (!response || !response.ok) { throw new Error('Failed to generate image after several retries.'); } const result = await response.json(); if (result.predictions && result.predictions[0]?.bytesBase64Encoded) { const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`; document.getElementById('edit-image-url').value = imageUrl; } else { throw new Error("No image data in API response."); } } catch (error) { console.error("Error generating cover art:", error); showConfirmation("Generation Failed", "Sorry, couldn't generate cover art. Please try again.", true); } finally { spinner.classList.add('hidden'); btnText.classList.remove('hidden'); suggestArtBtn.disabled = false; } }
