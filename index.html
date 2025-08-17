@@ -25,7 +25,7 @@
     <div class="flex flex-col h-screen">
         <!-- Header -->
         <header class="flex items-center justify-between p-4 w-full">
-            <h1 class="text-xl font-bold text-white">[untitled]</h1>
+            <h1 class="text-xl font-bold text-white">project_1</h1>
             <div class="flex items-center space-x-4">
                 <button class="p-2 rounded-full hover:bg-gray-700">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -41,32 +41,9 @@
         </header>
 
         <!-- Main Content: Album Grid -->
-        <main class="flex-grow flex items-center justify-center p-8">
+        <main class="flex-grow p-8 overflow-y-auto">
             <div id="album-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-8">
-                <!-- Sample Album 1 -->
-                <div class="w-48 space-y-2">
-                    <img src="https://placehold.co/200x200/7e22ce/white?text=UNRELEASED" alt="Album cover" class="w-full h-48 object-cover rounded-lg shadow-lg">
-                    <div class="text-white">
-                        <h3 class="font-bold">unreleased pack</h3>
-                        <p class="text-sm text-gray-400">MFBLAYDS</p>
-                    </div>
-                </div>
-                <!-- Sample Album 2 -->
-                <div class="w-48 space-y-2">
-                    <img src="https://placehold.co/200x200/f97316/white?text=EXTRA" alt="Album cover" class="w-full h-48 object-cover rounded-lg shadow-lg">
-                    <div class="text-white">
-                        <h3 class="font-bold">extra</h3>
-                        <p class="text-sm text-gray-400">MFBLAYDS</p>
-                    </div>
-                </div>
-                <!-- Sample Album 3 -->
-                <div class="w-48 space-y-2">
-                    <img src="https://placehold.co/200x200/22c55e/white?text=JUNK" alt="Album cover" class="w-full h-48 object-cover rounded-lg shadow-lg">
-                    <div class="text-white">
-                        <h3 class="font-bold">junk</h3>
-                        <p class="text-sm text-gray-400">MFBLAYDS</p>
-                    </div>
-                </div>
+                <!-- Albums will be loaded here from Firestore -->
             </div>
         </main>
 
@@ -105,7 +82,12 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        // Import Firebase services
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
         // --- DOM Elements ---
         const addButton = document.getElementById('add-button');
         const modalBackdrop = document.getElementById('add-modal-backdrop');
@@ -113,6 +95,51 @@
         const addAlbumForm = document.getElementById('add-album-form');
         const cancelButton = document.getElementById('cancel-button');
         const albumGrid = document.getElementById('album-grid');
+
+        // --- Firebase Setup ---
+        let db, auth;
+        let albumsCollection;
+        
+        // These variables are provided by the environment.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+        async function initializeFirebase() {
+            if (Object.keys(firebaseConfig).length === 0) {
+                console.error("Firebase config is not available.");
+                return;
+            }
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Path for the public collection of albums
+                const collectionPath = `/artifacts/${appId}/public/data/albums`;
+                albumsCollection = collection(db, collectionPath);
+
+                // Sign in the user
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Listen for authentication changes
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        console.log("User is signed in with UID:", user.uid);
+                        // Once authenticated, listen for live updates to the albums
+                        listenForAlbums();
+                    } else {
+                        console.log("User is signed out.");
+                    }
+                });
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+            }
+        }
+
 
         // --- Functions ---
         function showModal() {
@@ -132,17 +159,49 @@
             }, 300); // match transition duration
         }
 
-        function addAlbumToGrid(title, artist, imageUrl) {
-            const albumElement = document.createElement('div');
-            albumElement.className = 'w-48 space-y-2';
-            albumElement.innerHTML = `
-                <img src="${imageUrl}" alt="Album cover for ${title}" class="w-full h-48 object-cover rounded-lg shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/200x200/333/fff?text=Invalid';">
-                <div class="text-white">
-                    <h3 class="font-bold">${title}</h3>
-                    <p class="text-sm text-gray-400">${artist}</p>
-                </div>
-            `;
-            albumGrid.appendChild(albumElement);
+        // Renders all albums from the database
+        function renderAlbums(docs) {
+            albumGrid.innerHTML = ''; // Clear the grid first
+            docs.forEach(doc => {
+                const album = doc.data();
+                const albumElement = document.createElement('div');
+                albumElement.className = 'w-48 space-y-2';
+                albumElement.innerHTML = `
+                    <img src="${album.imageUrl}" alt="Album cover for ${album.title}" class="w-full h-48 object-cover rounded-lg shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/200x200/333/fff?text=Invalid';">
+                    <div class="text-white">
+                        <h3 class="font-bold">${album.title}</h3>
+                        <p class="text-sm text-gray-400">${album.artist}</p>
+                    </div>
+                `;
+                albumGrid.appendChild(albumElement);
+            });
+        }
+
+        // Listens for real-time updates from Firestore
+        function listenForAlbums() {
+            if (!albumsCollection) return;
+            onSnapshot(albumsCollection, (snapshot) => {
+                console.log("Received album updates:", snapshot.docs.length, "albums");
+                renderAlbums(snapshot.docs);
+            }, (error) => {
+                console.error("Error listening for album updates:", error);
+            });
+        }
+
+        // Saves a new album document to Firestore
+        async function saveAlbum(title, artist, imageUrl) {
+            try {
+                const newAlbum = {
+                    title: title,
+                    artist: artist,
+                    imageUrl: imageUrl,
+                    createdAt: new Date() // Optional: timestamp
+                };
+                const docRef = await addDoc(albumsCollection, newAlbum);
+                console.log("Album saved with ID:", docRef.id);
+            } catch (error) {
+                console.error("Error adding document: ", error);
+            }
         }
 
         // --- Event Listeners ---
@@ -154,15 +213,19 @@
             }
         });
 
-        addAlbumForm.addEventListener('submit', (event) => {
+        addAlbumForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             const title = document.getElementById('album-title').value;
             const artist = document.getElementById('artist-name').value;
             const imageUrl = document.getElementById('image-url').value;
             
-            addAlbumToGrid(title, artist, imageUrl);
+            await saveAlbum(title, artist, imageUrl);
             hideModal();
         });
+
+        // --- Initialize the application ---
+        initializeFirebase();
+
     </script>
 </body>
 </html>
