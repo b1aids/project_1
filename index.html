@@ -81,6 +81,12 @@
         .player-bar button:hover {
            transform: scale(1.1);
         }
+        .player-bar .group-hover\:bg-green-500:hover {
+            background-color: #22c55e;
+        }
+        .player-bar #progress-bar {
+            transition: background-color 0.2s ease-in-out;
+        }
     </style>
 </head>
 <body class="antialiased">
@@ -166,9 +172,9 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"></path></svg>
                     </button>
                     <button id="play-pause-btn" class="p-3 bg-white text-black rounded-full flex items-center justify-center">
-                         <!-- Play SVG Icon -->
+                           <!-- Play SVG Icon -->
                         <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
-                         <!-- Pause SVG Icon (hidden by default) -->
+                           <!-- Pause SVG Icon (hidden by default) -->
                         <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>
                     </button>
                     <button id="next-btn" class="p-2 text-gray-400 hover:text-white">
@@ -176,7 +182,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="m6 18 8.5-6L6 6v12zM16 6v12h2V6h-2z"></path></svg>
                     </button>
                     <button id="loop-btn" class="p-2 text-gray-400 hover:text-white">
-                         <!-- Loop SVG Icon -->
+                           <!-- Loop SVG Icon -->
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
                     </button>
                 </div>
@@ -265,7 +271,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
@@ -314,43 +320,47 @@
         const logoButton = document.getElementById('logo-button');
         
         // --- Firebase Setup ---
+        let db, auth, storage, userId, itemsCollectionRef;
+
         async function initializeFirebase() {
-            // IMPORTANT: Paste your Firebase config object here
-            const firebaseConfig = { 
-                apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc", 
-                authDomain: "project-1-f9e5b.firebaseapp.com", 
-                projectId: "project-1-f9e5b", 
-                storageBucket: "project-1-f9e5b.appspot.com", 
-                messagingSenderId: "272340259942", 
-                appId: "1:272340259942:web:a5a5a302342e0b4eb389a7", 
-                measurementId: "G-EKL8BPFSG1" 
-            };
-            if (!firebaseConfig.apiKey) {
-                document.body.innerHTML = `<div class="flex items-center justify-center h-screen text-center p-4"><div class="bg-red-900 border border-red-500 text-white p-6 rounded-lg"><h2 class="text-2xl font-bold mb-2">Error: Firebase Configuration Missing</h2><p>Please paste your Firebase config object into the 'initializeFirebase' function in the script.</p></div></div>`;
-                return;
-            }
-            const app = initializeApp(firebaseConfig);
-            window.db = getFirestore(app);
-            window.auth = getAuth(app);
-            window.storage = getStorage(app); // Initialize Cloud Storage
-            
-            onAuthStateChanged(auth, user => {
-                if (user) {
-                    // User is signed in
-                    window.userId = user.uid;
-                    window.itemsCollectionRef = collection(db, `users/${userId}/items`);
-                    updateUserProfile(user);
-                    initializeAppState();
+            try {
+                // Use the Firebase config provided by the Canvas environment for security
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                storage = getStorage(app);
+
+                // Authenticate the user using the Canvas provided token
+                const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (authToken) {
+                    await signInWithCustomToken(auth, authToken);
                 } else {
-                    // User is signed out
-                    if (itemsUnsubscribe) itemsUnsubscribe();
-                    if (tracksUnsubscribe) tracksUnsubscribe();
-                    itemGrid.innerHTML = '<div class="col-span-full text-center text-gray-500 mt-10">Please sign in to view your library.</div>';
-                    albumView.classList.add('hidden');
-                    gridView.classList.remove('hidden');
-                    updateUserProfile(null);
+                    await signInAnonymously(auth);
                 }
-            });
+
+                // Listen for authentication state changes to initialize the app
+                onAuthStateChanged(auth, user => {
+                    if (user) {
+                        userId = user.uid;
+                        // Use the app ID and user ID to ensure data is correctly scoped and secure
+                        itemsCollectionRef = collection(db, `artifacts/${__app_id}/users/${userId}/items`);
+                        updateUserProfile(user);
+                        initializeAppState();
+                    } else {
+                        // Handle signed-out state
+                        if (itemsUnsubscribe) itemsUnsubscribe();
+                        if (tracksUnsubscribe) tracksUnsubscribe();
+                        itemGrid.innerHTML = '<div class="col-span-full text-center text-gray-500 mt-10">Please sign in to view your library.</div>';
+                        albumView.classList.add('hidden');
+                        gridView.classList.remove('hidden');
+                        updateUserProfile(null);
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization error:", error);
+                document.body.innerHTML = `<div class="flex items-center justify-center h-screen text-center p-4"><div class="bg-red-900 border border-red-500 text-white p-6 rounded-lg"><h2 class="text-2xl font-bold mb-2">Error: Firebase Configuration Missing</h2><p>The app cannot run without a valid Firebase configuration. Please check the console for details.</p></div></div>`;
+            }
         }
 
         // --- Authentication ---
@@ -359,23 +369,25 @@
         function signIn() {
             signInWithPopup(auth, provider).catch(error => {
                 console.error("Sign in error:", error);
+                showConfirmation("Sign In Failed", `Error: ${error.message}`, true);
             });
         }
 
         function signOutUser() {
             signOut(auth).catch(error => {
                 console.error("Sign out error:", error);
+                showConfirmation("Sign Out Failed", `Error: ${error.message}`, true);
             });
         }
 
         function updateUserProfile(user) {
             if (user) {
                 userProfileDiv.innerHTML = `
-                    <img id="user-pfp-btn" src="${user.photoURL}" alt="User Avatar" class="w-10 h-10 rounded-full cursor-pointer hover:opacity-80">
+                    <img id="user-pfp-btn" src="${user.photoURL || 'https://placehold.co/40x40/5865F2/FFFFFF?text=U'}" alt="User Avatar" class="w-10 h-10 rounded-full cursor-pointer hover:opacity-80">
                 `;
                 document.getElementById('user-pfp-btn').addEventListener('click', () => {
-                    document.getElementById('settings-pfp').src = user.photoURL;
-                    document.getElementById('settings-username').textContent = user.displayName;
+                    document.getElementById('settings-pfp').src = user.photoURL || 'https://placehold.co/64x64/5865F2/FFFFFF?text=U';
+                    document.getElementById('settings-username').textContent = user.displayName || 'Anonymous User';
                     showModal(settingsModal);
                 });
                 document.getElementById('sign-out-btn').addEventListener('click', signOutUser);
@@ -581,11 +593,11 @@
         }
 
         // --- Firestore & Storage Logic ---
-        function listenForItems() { if (window.itemsCollectionRef) { setLoadingState(true); if (itemsUnsubscribe) itemsUnsubscribe(); const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId)); itemsUnsubscribe = onSnapshot(q, s => renderItems(s.docs.sort((a, b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => { setLoadingState(false); console.error("Error listening for items:", e); showConfirmation("Error", "Failed to load your library. Please try again later.", true); }); } }
-        function listenForTracks(albumId) { if (window.itemsCollectionRef) { setLoadingState(true); const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); if (tracksUnsubscribe) tracksUnsubscribe(); tracksUnsubscribe = onSnapshot(query(tracksRef), s => renderTracks(s.docs.sort((a,b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => { setLoadingState(false); console.error("Error listening for tracks:", e); showConfirmation("Error", "Failed to load tracks. Please try again later.", true); }); } }
+        function listenForItems() { if (itemsCollectionRef) { setLoadingState(true); if (itemsUnsubscribe) itemsUnsubscribe(); const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId)); itemsUnsubscribe = onSnapshot(q, s => renderItems(s.docs.sort((a, b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => { setLoadingState(false); console.error("Error listening for items:", e); showConfirmation("Error", "Failed to load your library. Please try again later.", true); }); } }
+        function listenForTracks(albumId) { if (itemsCollectionRef) { setLoadingState(true); const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); if (tracksUnsubscribe) tracksUnsubscribe(); tracksUnsubscribe = onSnapshot(query(tracksRef), s => renderTracks(s.docs.sort((a,b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => { setLoadingState(false); console.error("Error listening for tracks:", e); showConfirmation("Error", "Failed to load tracks. Please try again later.", true); }); } }
         
         async function createItem(type) { 
-            if (!window.itemsCollectionRef) return;
+            if (!itemsCollectionRef) return;
             
             let name = `New ${type}`;
             let counter = 1;
@@ -611,7 +623,7 @@
         
         function addTrack(albumId, file) {
             console.log('Attempting to upload track:', file.name, 'to album:', albumId);
-            if (!window.itemsCollectionRef || !window.userId) {
+            if (!itemsCollectionRef || !userId) {
                 console.error("Upload failed: User or database not initialized.");
                 showConfirmation("Error", "Failed to upload file. Please sign in and try again.", true);
                 return;
@@ -624,7 +636,8 @@
             trackList.appendChild(placeholderEl);
             const progressSpan = placeholderEl.querySelector('.upload-progress');
 
-            const storageRef = ref(storage, `users/${userId}/tracks/${Date.now()}_${file.name}`);
+            // Use the Canvas app ID and user ID to ensure file paths are isolated and secure
+            const storageRef = ref(storage, `artifacts/${__app_id}/users/${userId}/tracks/${Date.now()}_${file.name}`);
             const uploadTask = uploadBytesResumable(storageRef, file);
 
             uploadTask.on('state_changed', 
@@ -655,7 +668,7 @@
 
         async function removeTrack(albumId, trackId) {
             try {
-                if (window.itemsCollectionRef) { 
+                if (itemsCollectionRef) { 
                     await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId)); 
                 }
             } catch (error) {
@@ -666,7 +679,7 @@
 
         async function updateItem(id, data) {
             try {
-                if(window.itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data);
+                if(itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data);
             } catch (error) {
                 console.error("Error updating item:", error);
                 showConfirmation("Error", "Failed to update item. Please try again.", true);
@@ -675,7 +688,7 @@
         
         async function deleteItem(id) { 
             try {
-                if(window.itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id));
+                if(itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id));
             } catch (error) {
                 console.error("Error deleting item:", error);
                 showConfirmation("Error", "Failed to delete item. Please try again.", true);
@@ -732,7 +745,7 @@
             
             const prompt = `Album cover for a project titled '${title}' by the artist '${artist}'. Style: vibrant, abstract, digital art.`; 
             const payload = { instances: [{ prompt }], parameters: { "sampleCount": 1 } }; 
-            const apiKey = ""; 
+            const apiKey = ""; // The Canvas environment will provide the API key at runtime.
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`; 
             
             try { 
@@ -801,8 +814,6 @@
         
         // --- Upload Listeners ---
         dropZone.addEventListener('click', () => {
-            // This is where you would initiate a Google Drive Picker if you were to implement it.
-            // For now, it opens the local file picker.
             audioUpload.click();
         });
         audioUpload.addEventListener('change', (e) => {
