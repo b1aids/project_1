@@ -225,7 +225,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- State Management ---
         let currentView = 'grid', currentFolderId = 'root', currentAlbum = null;
@@ -324,20 +324,18 @@
                 currentFolderId = id;
                 updateView('grid');
             } else if (type === 'album' && id) {
-                // We need to fetch the album data since it's not in the hash
                 const albumDocRef = doc(db, itemsCollectionRef.path, id);
                 const albumDoc = await getDoc(albumDocRef);
                 if (albumDoc.exists()) {
                     currentAlbum = { id: albumDoc.id, data: albumDoc.data() };
-                    currentFolderId = currentAlbum.data.parentId; // Set parent folder context
+                    currentFolderId = currentAlbum.data.parentId;
                     updateView('album');
                 } else {
                     console.error("Album not found, redirecting to root.");
                     location.hash = 'folder/root';
                 }
             } else {
-                currentFolderId = 'root';
-                updateView('grid');
+                location.hash = 'folder/root';
             }
         }
 
@@ -349,7 +347,7 @@
             backButton.style.display = (currentFolderId !== 'root' || view === 'album') ? 'flex' : 'none';
 
             if (view === 'grid') {
-                headerTitle.textContent = currentFolderId === 'root' ? 'project_1' : '...'; // Placeholder, will be updated by listener
+                headerTitle.textContent = currentFolderId === 'root' ? 'project_1' : '...';
                 gridView.classList.remove('hidden');
                 albumView.classList.add('hidden');
                 listenForItems();
@@ -368,12 +366,11 @@
 
         // --- Data Rendering ---
         function renderItems(docs) {
-            currentItemDocs = docs.map(doc => ({ id: doc.id, data: doc.data() })); // Cache for duplicate checks
+            currentItemDocs = docs.map(doc => ({ id: doc.id, data: doc.data() }));
             itemGrid.innerHTML = '';
             itemCount = docs.length;
             if (docs.length === 0) { itemGrid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10">Right-click to add your first album or folder.</div>`; }
             
-            // Update folder title if we are in a subfolder
             if (currentFolderId !== 'root') {
                  getDoc(doc(db, itemsCollectionRef.path, currentFolderId)).then(docSnap => {
                      if(docSnap.exists()) headerTitle.textContent = docSnap.data().title;
@@ -497,26 +494,37 @@
             await addDoc(itemsCollectionRef, data); 
         }
         
-        async function addTrack(albumId, file) {
+        function addTrack(albumId, file) {
             if (!window.itemsCollectionRef || !window.userId) return;
             
             const trackList = document.getElementById('track-list');
             const placeholderEl = document.createElement('div');
-            placeholderEl.className = 'flex items-center p-2 rounded-md text-gray-500 animate-pulse';
-            placeholderEl.innerHTML = `<div class="w-8 text-right mr-4">...</div><div class="flex-grow">${file.name} (Uploading...)</div>`;
+            placeholderEl.className = 'flex items-center p-2 rounded-md text-gray-500';
+            placeholderEl.innerHTML = `<div class="w-8 text-right mr-4">...</div><div class="flex-grow">${file.name} <span class="upload-progress">(0%)</span></div>`;
             trackList.appendChild(placeholderEl);
+            const progressSpan = placeholderEl.querySelector('.upload-progress');
 
             const storageRef = ref(storage, `users/${userId}/tracks/${Date.now()}_${file.name}`);
-            try {
-                const snapshot = await uploadBytes(storageRef, file);
-                const downloadURL = await getDownloadURL(snapshot.ref);
-                const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
-                await addDoc(tracksRef, { fileName: file.name, fileUrl: downloadURL, createdAt: serverTimestamp() });
-            } catch (error) {
-                console.error("Error uploading file:", error);
-                placeholderEl.remove();
-                showConfirmation("Upload Failed", `Could not upload ${file.name}. Please check your connection and Firebase Storage rules.`, true);
-            }
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on('state_changed', 
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    progressSpan.textContent = `(${Math.round(progress)}%)`;
+                }, 
+                (error) => {
+                    console.error("Error uploading file:", error);
+                    placeholderEl.remove();
+                    showConfirmation("Upload Failed", `Could not upload ${file.name}. Please check your connection and Firebase Storage rules.`, true);
+                }, 
+                () => {
+                    getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+                        const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
+                        await addDoc(tracksRef, { fileName: file.name, fileUrl: downloadURL, createdAt: serverTimestamp() });
+                        // The placeholder will be removed automatically when the listener updates the track list
+                    });
+                }
+            );
         }
 
         async function removeTrack(albumId, trackId) { if (window.itemsCollectionRef) { await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId)); } }
