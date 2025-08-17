@@ -220,7 +220,7 @@
             </div>
         </div>
     </div>
-    <!-- NEW Settings Modal -->
+    <!-- Settings Modal -->
     <div id="settings-modal" class="modal fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 opacity-0 transition-opacity">
         <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md transform scale-95 transition-transform">
             <div class="flex items-center justify-between mb-6">
@@ -240,11 +240,11 @@
                 <h4 class="text-lg font-semibold text-white border-b border-gray-700 pb-2">Connections</h4>
                 <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
                     <span class="font-semibold">Google Drive</span>
-                    <button id="connect-drive-btn" class="py-1 px-3 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg">Connect</button>
+                    <button id="connect-drive-btn" class="py-1 px-3 bg-gray-600 text-gray-400 text-sm rounded-lg cursor-not-allowed" disabled>Coming Soon</button>
                 </div>
                 <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
                     <span class="font-semibold">Discord</span>
-                    <button id="connect-discord-btn" class="py-1 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg">Connect</button>
+                    <button id="connect-discord-btn" class="py-1 px-3 bg-gray-600 text-gray-400 text-sm rounded-lg cursor-not-allowed" disabled>Coming Soon</button>
                 </div>
             </div>
 
@@ -744,8 +744,6 @@
         document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => { hideModal(renameModal); hideModal(editModal); }));
         document.getElementById('confirm-cancel-btn').addEventListener('click', () => hideModal(confirmModal));
         document.getElementById('settings-close-btn').addEventListener('click', () => hideModal(settingsModal));
-        document.getElementById('connect-drive-btn').addEventListener('click', () => console.log('Connect to Google Drive clicked'));
-        document.getElementById('connect-discord-btn').addEventListener('click', () => console.log('Connect to Discord clicked'));
 
         // --- Initialize ---
         function initializeAppState() {
