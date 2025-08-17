@@ -737,7 +737,14 @@
 
         // --- UI (Menus & Modals) ---
         function showContextMenu(menu, x, y) { hideAllContextMenus(); if(menu === contextMenuItem) { document.getElementById('edit-btn').disabled = contextTarget.data.type === 'folder'; } const menuWidth = menu.offsetWidth, menuHeight = menu.offsetHeight, screenWidth = window.innerWidth, screenHeight = window.innerHeight; menu.style.left = `${Math.min(x, screenWidth - menuWidth - 10)}px`; menu.style.top = `${Math.min(y, screenHeight - menuHeight - 10)}px`; menu.classList.remove('hidden'); setTimeout(() => menu.classList.remove('opacity-0', 'scale-95'), 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
-        function handleOutsideClick(event) { const isClickInsideMenu = contextMenuBg.contains(event.target) || contextMenuItem.contains(event.target) || contextMenuTrack.contains(event.target) || settingsModal.contains(event.target); if (!isClickInsideMenu) { hideAllContextMenus(); hideModal(settingsModal); } else { document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); } }
+        function handleOutsideClick(event) { 
+          if (!settingsModal.contains(event.target) && !settingsModal.classList.contains('hidden')) {
+              hideModal(settingsModal);
+          }
+          if (!contextMenuBg.contains(event.target) && !contextMenuItem.contains(event.target) && !contextMenuTrack.contains(event.target)) {
+            hideAllContextMenus();
+          }
+        }
         function hideAllContextMenus() { document.removeEventListener('mousedown', handleOutsideClick, { capture: true }); [contextMenuBg, contextMenuItem, contextMenuTrack].forEach(m => { if (!m.classList.contains('hidden')) { m.classList.add('opacity-0', 'scale-95'); setTimeout(() => m.classList.add('hidden'), 200); } }); }
         function showModal(modal) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
         function hideModal(modal) { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); document.removeEventListener('mousedown', handleOutsideClick, { capture: true });}
