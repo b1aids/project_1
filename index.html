@@ -262,6 +262,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- State Management ---
         let currentView = 'grid', currentFolderId = 'root', currentAlbum = null;
@@ -284,7 +285,7 @@
         let gapiLoaded = false;
         let gisLoaded = false;
         let tokenClient;
-        const CLIENT_ID = '272340259942-5373s4d41405sou465aukk7l5r9mnf43.apps.googleusercontent.com'; // Replace with your client ID
+        const CLIENT_ID = 'YOUR_GOOGLE_DRIVE_API_CLIENT_ID'; // Replace with your client ID
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
         
         // --- Discord API State ---
@@ -323,7 +324,7 @@
         
         // --- Firebase Setup ---
         async function initializeFirebase() {
-            // IMPORTANT: Paste your Firebase config object here
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
             const firebaseConfig = { 
                 apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc", 
                 authDomain: "project-1-f9e5b.firebaseapp.com", 
@@ -340,23 +341,35 @@
             const app = initializeApp(firebaseConfig);
             window.db = getFirestore(app);
             window.auth = getAuth(app);
-            window.storage = getStorage(app); // Initialize Cloud Storage
             
+            // onAuthStateChanged is the central place to handle user state.
             onAuthStateChanged(auth, user => {
                 if (user) {
-                    // User is signed in
+                    // User is signed in.
                     window.userId = user.uid;
-                    window.itemsCollectionRef = collection(db, `users/${userId}/items`);
-                    updateUserProfile(user);
+                    // Check if the user is anonymous. If so, don't show a sign-out button.
+                    const isAnon = user.isAnonymous;
+                    window.itemsCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/items`);
+                    updateUserProfile(user, !isAnon);
                     initializeAppState();
                 } else {
-                    // User is signed out
+                    // User is signed out. Display sign-in UI.
                     if (itemsUnsubscribe) itemsUnsubscribe();
                     if (tracksUnsubscribe) tracksUnsubscribe();
-                    itemGrid.innerHTML = '<div class="col-span-full text-center text-gray-500 mt-10">Please sign in to view your library.</div>';
-                    albumView.classList.add('hidden');
-                    gridView.classList.remove('hidden');
-                    updateUserProfile(null);
+                    
+                    document.body.innerHTML = `
+                        <div class="flex flex-col h-screen items-center justify-center p-4">
+                            <div class="flex items-center gap-3 mb-6">
+                                <img src="https://placehold.co/32x32/5865F2/FFFFFF?text=P1" alt="Logo" class="h-8 w-8 rounded">
+                                <h1 class="text-2xl font-bold text-white">project_1</h1>
+                            </div>
+                            <div class="text-center p-8 bg-[#202225] rounded-lg shadow-xl border border-gray-700">
+                                <p class="text-lg text-gray-300 mb-6">Sign in to access your library.</p>
+                                <button id="sign-in-btn" class="py-2 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors">Sign In with Google</button>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('sign-in-btn').addEventListener('click', signIn);
                 }
             });
         }
@@ -402,10 +415,7 @@
                 document.getElementById('sign-out-btn').addEventListener('click', signOutUser);
 
             } else {
-                userProfileDiv.innerHTML = `
-                    <button id="sign-in-btn" class="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg">Sign In with Google</button>
-                `;
-                document.getElementById('sign-in-btn').addEventListener('click', signIn);
+                userProfileDiv.innerHTML = ``; // Clear user profile when signed out
             }
         }
         
