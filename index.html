@@ -56,17 +56,7 @@
             opacity: 1;
             transform: scale(1);
         }
-        .progress-bar-container {
-            background-color: #4f4f4f;
-            height: 4px;
-            cursor: pointer;
-        }
-        .progress-bar {
-            background-color: #fff;
-            height: 100%;
-            width: 0%;
-            transition: width 0.1s linear;
-        }
+        
         .player-bar button:disabled {
             opacity: 0.4;
             cursor: not-allowed;
@@ -90,6 +80,13 @@
         }
         .player-bar button:hover {
              transform: scale(1.1);
+        }
+
+        /* --- Waveform Canvas --- */
+        #waveform-canvas {
+            width: 100%;
+            height: 50px; /* Height of the waveform */
+            cursor: pointer;
         }
     </style>
 </head>
@@ -154,6 +151,8 @@
                 </div>
             </div>
             <div class="w-1/2 flex flex-col items-center justify-center gap-2">
+                 <!-- Waveform Canvas replaces the progress bar -->
+                <canvas id="waveform-canvas"></canvas>
                 <div class="flex items-center gap-4">
                     <button id="shuffle-btn" class="p-2 hover:text-green-500 transition-colors"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M3.478 5.555A.5.5 0 003 6v8a.5.5 0 00.978.222l2-4a.5.5 0 000-.444l-2-4a.5.5 0 00-.5-.222zM15.5 5.5a.5.5 0 01.978-.222l2 4a.5.5 0 010 .444l-2 4A.5.5 0 0115.5 14V5.5zM12.978 4.222a.5.5 0 00-.956 0l-2.5 5a.5.5 0 000 .556l2.5 5a.5.5 0 00.956-.222l2.5-5a.5.5 0 000-.556l-2.5-5zM6.53 9.098a.5.5 0 000 .804l2 1.5a.5.5 0 00.82-.325V7.923a.5.5 0 00-.82-.325l-2 1.5z"></path></svg></button>
                     <button id="prev-btn" class="p-2"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M8.445 14.832A1 1 0 0010 14.155V5.845a1 1 0 00-1.555-.832L4.12 8.168a1 1 0 000 1.664l4.325 3.001zM15.555 4.168A1 1 0 0014 5.832v8.323a1 1 0 001.555.832l4.325-3.001a1 1 0 000-1.664l-4.325-3.001z"></path></svg></button>
@@ -161,11 +160,9 @@
                     <button id="next-btn" class="p-2"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M4.445 4.168A1 1 0 003 5.832v8.323a1 1 0 001.445.894l4.325-3.001a1 1 0 000-1.788L4.445 4.168zM11.555 4.168A1 1 0 0010 5.832v8.323a1 1 0 001.555.832l4.325-3.001a1 1 0 000-1.664l-4.325-3.001z"></path></svg></button>
                     <button id="stop-btn" class="p-2"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3.75A1.75 1.75 0 003.25 5.5v9A1.75 1.75 0 005 16.25h10A1.75 1.75 0 0016.75 14.5v-9A1.75 1.75 0 0015 3.75H5z"></path></svg></button>
                 </div>
-                <div class="w-full flex items-center gap-2 text-xs">
+                <div class="w-full flex items-center gap-2 text-xs -mt-2">
                     <span id="current-time">0:00</span>
-                    <div id="progress-bar-container" class="progress-bar-container w-full rounded-full">
-                        <div id="progress-bar" class="progress-bar rounded-full"></div>
-                    </div>
+                    <div class="w-full"></div> <!-- Spacer for canvas -->
                     <span id="total-time">0:00</span>
                 </div>
             </div>
@@ -214,6 +211,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- State Management ---
         let currentView = 'grid', currentFolderId = 'root', currentAlbum = null;
@@ -224,10 +222,15 @@
         
         // --- Player State ---
         const audio = new Audio();
+        audio.crossOrigin = "anonymous"; // Required for audio analysis
         let currentPlaylist = [];
         let currentTrackIndex = -1;
         let isPlaying = false;
         let isShuffle = false;
+        
+        // --- Web Audio API for Visualization ---
+        let audioContext, analyser, sourceNode, dataArray;
+        let isAudioContextInitialized = false;
 
         // --- DOM Elements ---
         const gridView = document.getElementById('grid-view'), albumView = document.getElementById('album-view');
@@ -241,7 +244,7 @@
         const albumArtWrapper = document.getElementById('album-art-wrapper');
         const playerBar = document.getElementById('player-bar');
         const playPauseBtn = document.getElementById('play-pause-btn'), playIcon = document.getElementById('play-icon'), pauseIcon = document.getElementById('pause-icon');
-        const progressBar = document.getElementById('progress-bar'), progressBarContainer = document.getElementById('progress-bar-container');
+        const waveformCanvas = document.getElementById('waveform-canvas');
         const stopBtn = document.getElementById('stop-btn');
         const nextBtn = document.getElementById('next-btn');
         const prevBtn = document.getElementById('prev-btn');
@@ -257,6 +260,7 @@
             const app = initializeApp(firebaseConfig);
             window.db = getFirestore(app);
             window.auth = getAuth(app);
+            window.storage = getStorage(app); // Initialize Cloud Storage
             onAuthStateChanged(auth, user => {
                 if (user) {
                     window.userId = user.uid;
@@ -337,9 +341,24 @@
             });
         }
         
-        // --- Audio Player Logic ---
+        // --- Audio Player & Visualization Logic ---
+        function initializeAudioContext() {
+            if (isAudioContextInitialized) return;
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            sourceNode = audioContext.createMediaElementSource(audio);
+            sourceNode.connect(analyser);
+            analyser.connect(audioContext.destination);
+            analyser.fftSize = 256;
+            const bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+            isAudioContextInitialized = true;
+            visualize();
+        }
+
         function playTrack(index) {
             if (index < 0 || index >= currentPlaylist.length) return;
+            if (!isAudioContextInitialized) initializeAudioContext();
             currentTrackIndex = index;
             const track = currentPlaylist[index];
             audio.src = track.fileUrl;
@@ -347,21 +366,68 @@
             isPlaying = true;
             updatePlayerUI(track);
             updatePlayPauseIcon();
-            playerBar.classList.add('visible'); // Show player bar
+            playerBar.classList.add('visible');
         }
-        function togglePlayPause() { if (currentTrackIndex === -1) return; if (isPlaying) { audio.pause(); } else { audio.play(); } isPlaying = !isPlaying; updatePlayPauseIcon(); }
-        function stopPlayback() { audio.pause(); audio.currentTime = 0; isPlaying = false; updatePlayPauseIcon(); playerBar.classList.remove('visible'); } // Hide player bar
+
+        function visualize() {
+            const canvasCtx = waveformCanvas.getContext('2d');
+            const WIDTH = waveformCanvas.width;
+            const HEIGHT = waveformCanvas.height;
+
+            analyser.getByteFrequencyData(dataArray);
+            
+            canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
+
+            const barWidth = (WIDTH / dataArray.length) * 1.5;
+            let x = 0;
+
+            // Create a fiery gradient
+            const gradient = canvasCtx.createLinearGradient(0, 0, 0, HEIGHT);
+            gradient.addColorStop(0, 'red');
+            gradient.addColorStop(0.5, 'orange');
+            gradient.addColorStop(1, 'yellow');
+            canvasCtx.fillStyle = gradient;
+
+            for (let i = 0; i < dataArray.length; i++) {
+                const barHeight = dataArray[i] / 2;
+                canvasCtx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight);
+                x += barWidth + 1;
+            }
+            
+            // Draw progress overlay
+            if (audio.duration) {
+                const progress = audio.currentTime / audio.duration;
+                canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                canvasCtx.fillRect(0, 0, WIDTH * progress, HEIGHT);
+            }
+
+            requestAnimationFrame(visualize);
+        }
+
+        function togglePlayPause() { if (currentTrackIndex === -1) return; if (isPlaying) { audio.pause(); } else { audio.play(); if(!isAudioContextInitialized) initializeAudioContext(); } isPlaying = !isPlaying; updatePlayPauseIcon(); }
+        function stopPlayback() { audio.pause(); audio.currentTime = 0; isPlaying = false; updatePlayPauseIcon(); playerBar.classList.remove('visible'); }
         function playNext() { if (currentPlaylist.length === 0) return; let nextIndex = isShuffle ? Math.floor(Math.random() * currentPlaylist.length) : currentTrackIndex + 1; if (nextIndex >= currentPlaylist.length) nextIndex = 0; playTrack(nextIndex); }
         function playPrev() { if (currentPlaylist.length === 0) return; let prevIndex = currentTrackIndex - 1; if (prevIndex < 0) prevIndex = currentPlaylist.length - 1; playTrack(prevIndex); }
         function updatePlayerUI(track) { document.getElementById('player-album-art').src = track.albumArt; document.getElementById('player-track-title').textContent = track.fileName; document.getElementById('player-track-artist').textContent = track.artist; }
         function updatePlayPauseIcon() { playIcon.classList.toggle('hidden', isPlaying); pauseIcon.classList.toggle('hidden', !isPlaying); }
         function formatTime(seconds) { const minutes = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60); return `${minutes}:${secs < 10 ? '0' : ''}${secs}`; }
 
-        // --- Firestore Logic ---
+        // --- Firestore & Storage Logic ---
         function listenForItems() { if (window.itemsCollectionRef) { if (itemsUnsubscribe) itemsUnsubscribe(); const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId)); itemsUnsubscribe = onSnapshot(q, s => renderItems(s.docs.sort((a, b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for items:", e)); } }
         function listenForTracks(albumId) { if (window.itemsCollectionRef) { const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); if (tracksUnsubscribe) tracksUnsubscribe(); tracksUnsubscribe = onSnapshot(query(tracksRef), s => renderTracks(s.docs.sort((a,b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for tracks:", e)); } }
         async function createItem(type) { if (window.itemsCollectionRef) { const name = `New ${type} ${itemCount + 1}`; const data = { title: name, type, parentId: currentFolderId, createdAt: serverTimestamp() }; if (type === 'album') { data.artist = 'Untitled Artist'; data.imageUrl = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(name)}`; } await addDoc(itemsCollectionRef, data); } }
-        async function addTrack(albumId, file) { if (!window.itemsCollectionRef) return; const fileUrl = URL.createObjectURL(file); const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); await addDoc(tracksRef, { fileName: file.name, fileUrl: fileUrl, createdAt: serverTimestamp() }); }
+        async function addTrack(albumId, file) {
+            if (!window.itemsCollectionRef || !window.userId) return;
+            const storageRef = ref(storage, `users/${userId}/tracks/${Date.now()}_${file.name}`);
+            try {
+                const snapshot = await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
+                await addDoc(tracksRef, { fileName: file.name, fileUrl: downloadURL, createdAt: serverTimestamp() });
+            } catch (error) {
+                console.error("Error uploading file:", error);
+            }
+        }
         async function removeTrack(albumId, trackId) { if (window.itemsCollectionRef) { await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId)); } }
         async function updateItem(id, data) { if(window.itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data); }
         async function deleteItem(id) { if(window.itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id)); }
@@ -395,10 +461,9 @@
         nextBtn.addEventListener('click', playNext);
         prevBtn.addEventListener('click', playPrev);
         shuffleBtn.addEventListener('click', () => { isShuffle = !isShuffle; shuffleBtn.classList.toggle('text-green-500', isShuffle); });
-        audio.addEventListener('timeupdate', () => { if (audio.duration) { const percent = (audio.currentTime / audio.duration) * 100; progressBar.style.width = `${percent}%`; document.getElementById('current-time').textContent = formatTime(audio.currentTime); } });
-        audio.addEventListener('loadedmetadata', () => { document.getElementById('total-time').textContent = formatTime(audio.duration); });
+        audio.addEventListener('timeupdate', () => { if (audio.duration) { document.getElementById('current-time').textContent = formatTime(audio.currentTime); document.getElementById('total-time').textContent = formatTime(audio.duration); } });
         audio.addEventListener('ended', playNext);
-        progressBarContainer.addEventListener('click', (e) => { if (!audio.duration) return; const rect = progressBarContainer.getBoundingClientRect(); const percent = (e.clientX - rect.left) / rect.width; audio.currentTime = percent * audio.duration; });
+        waveformCanvas.addEventListener('click', (e) => { if (!audio.duration) return; const rect = waveformCanvas.getBoundingClientRect(); const percent = (e.clientX - rect.left) / rect.width; audio.currentTime = percent * audio.duration; });
         document.getElementById('add-album-btn').addEventListener('click', e => { e.preventDefault(); createItem('album'); hideAllContextMenus(); });
         document.getElementById('add-folder-btn').addEventListener('click', e => { e.preventDefault(); createItem('folder'); hideAllContextMenus(); });
         document.getElementById('rename-btn').addEventListener('click', e => { e.preventDefault(); document.getElementById('rename-input').value = contextTarget.data.title; showModal(renameModal); hideAllContextMenus(); });
