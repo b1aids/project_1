@@ -10,6 +10,7 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #202225;
+            color: #dcddde;
         }
         .transition-all { transition: all 0.2s ease-in-out; }
         .transition-opacity { transition: opacity 0.2s ease-in-out; }
@@ -21,15 +22,32 @@
         .item-fade-in { animation: fadeIn 0.3s ease-in-out forwards; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Spinner for loading state */
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 2px solid #fff;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Custom modal styles */
+        .modal {
+            display: flex; /* Changed from hidden to flex for easier control with JS */
+        }
     </style>
 </head>
-<body class="text-gray-300 antialiased">
+<body class="antialiased">
 
     <div id="app-container" class="flex flex-col h-screen">
         <!-- Header -->
-        <header class="flex items-center justify-between p-4 w-full flex-shrink-0">
+        <header class="flex items-center justify-between p-4 w-full flex-shrink-0 bg-[#202225] z-10">
             <div class="flex items-center space-x-4">
-                 <button id="back-button" class="p-2 rounded-full hover:bg-gray-700 hidden">
+                <button id="back-button" class="p-2 rounded-full hover:bg-gray-700 hidden">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 <h1 id="header-title" class="text-xl font-bold text-white">project_1</h1>
@@ -41,20 +59,20 @@
         </header>
 
         <!-- Grid View -->
-        <main id="grid-view" class="flex-grow p-8 overflow-y-auto no-scrollbar">
-            <div id="item-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-8"></div>
+        <main id="grid-view" class="flex-grow p-4 md:p-8 overflow-y-auto no-scrollbar">
+            <div id="item-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-8"></div>
         </main>
 
         <!-- Album Detail View -->
-        <main id="album-view" class="hidden flex-grow p-8 overflow-y-auto no-scrollbar">
+        <main id="album-view" class="hidden flex-grow p-4 md:p-8 overflow-y-auto no-scrollbar">
             <div class="flex flex-col md:flex-row gap-8">
                 <!-- Left Side: Album Art & Info -->
                 <div class="w-full md:w-1/3 lg:w-1/4 flex-shrink-0">
-                    <img id="album-view-cover" src="" class="w-full h-auto object-cover rounded-lg shadow-2xl mb-4">
+                    <img id="album-view-cover" src="" class="w-full h-auto object-cover rounded-lg shadow-2xl mb-4" onerror="this.src='https://placehold.co/400x400/333/fff?text=Error';">
                     <h2 id="album-view-title" class="text-3xl font-bold text-white"></h2>
                     <p id="album-view-artist" class="text-lg text-gray-400"></p>
                     <p id="album-view-meta" class="text-sm text-gray-500 mt-1"></p>
-                    <button id="album-play-button" class="mt-4 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full flex items-center justify-center text-lg">
+                    <button id="album-play-button" class="mt-4 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full flex items-center justify-center text-lg transition-all">
                         <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M4.018 15.59a.5.5 0 00.816.372l10-6a.5.5 0 000-.744l-10-6A.5.5 0 004.018 4.41v11.18z"></path></svg>
                         Play
                     </button>
@@ -64,7 +82,7 @@
                     <div id="track-list" class="space-y-2">
                         <!-- Tracks will be loaded here -->
                     </div>
-                     <div id="drop-message" class="mt-4 text-center p-8 border-2 border-dashed border-gray-700 rounded-lg">
+                     <div id="drop-message" class="mt-4 text-center p-8 border-2 border-dashed border-gray-700 rounded-lg transition-all">
                         <p class="text-gray-500">Drag & Drop Audio Files Here to Add Tracks</p>
                     </div>
                 </div>
@@ -72,43 +90,62 @@
         </main>
     </div>
 
-    <!-- Context Menus & Modals -->
-    <div id="context-menu-bg" class="fixed bg-gray-800 text-white w-56 rounded-md shadow-xl py-2 z-50 hidden opacity-0 transform scale-95 transition-all">
-        <a href="#" id="add-album-btn" class="flex items-center px-4 py-2 text-sm hover:bg-indigo-600 rounded-md m-1 transition-colors">+ Add Album</a>
-        <a href="#" id="add-folder-btn" class="flex items-center px-4 py-2 text-sm hover:bg-indigo-600 rounded-md m-1 transition-colors">+ Add Folder</a>
+    <!-- Context Menus -->
+    <div id="context-menu-bg" class="fixed bg-gray-900 text-white w-56 rounded-lg shadow-xl p-2 z-50 hidden opacity-0 transform scale-95 transition-all">
+        <a href="#" id="add-album-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-12c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 6l12-3" /></svg>Add Album</a>
+        <a href="#" id="add-folder-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>Add Folder</a>
     </div>
-    <div id="context-menu-item" class="fixed bg-gray-800 text-white w-56 rounded-md shadow-xl py-2 z-50 hidden opacity-0 transform scale-95 transition-all">
-        <a href="#" id="rename-btn" class="flex items-center px-4 py-2 text-sm hover:bg-indigo-600 rounded-md m-1 transition-colors">Rename</a>
-        <a href="#" id="edit-btn" class="flex items-center px-4 py-2 text-sm hover:bg-indigo-600 rounded-md m-1 transition-colors">Edit</a>
-        <div class="border-t border-gray-700 my-1"></div>
-        <a href="#" id="delete-btn" class="flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-500 hover:text-white rounded-md m-1 transition-colors">Delete</a>
+    <div id="context-menu-item" class="fixed bg-gray-900 text-white w-56 rounded-lg shadow-xl p-2 z-50 hidden opacity-0 transform scale-95 transition-all">
+        <a href="#" id="rename-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>Rename</a>
+        <a href="#" id="edit-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors disabled:opacity-50 disabled:hover:bg-transparent"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>Edit</a>
+        <div class="border-t border-gray-700 my-2"></div>
+        <a href="#" id="delete-btn" class="flex items-center px-3 py-2 text-sm text-red-400 hover:bg-red-500 hover:text-white rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>Delete</a>
     </div>
-    <div id="rename-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 opacity-0 transition-opacity">
+
+    <!-- Modals -->
+    <div id="rename-modal" class="modal fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 opacity-0 transition-opacity">
         <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md transform scale-95 transition-transform">
             <h2 class="text-2xl font-bold text-white mb-6">Rename Item</h2>
-            <form id="rename-form"><input type="text" id="rename-input" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white"><div class="mt-8 flex justify-end space-x-4"><button type="button" class="modal-cancel py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white rounded-lg">Cancel</button><button type="submit" class="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">Save</button></div></form>
+            <form id="rename-form"><input type="text" id="rename-input" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"><div class="mt-8 flex justify-end space-x-4"><button type="button" class="modal-cancel py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors">Cancel</button><button type="submit" class="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">Save</button></div></form>
         </div>
     </div>
-    <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 opacity-0 transition-opacity">
+    <div id="edit-modal" class="modal fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 opacity-0 transition-opacity">
         <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md transform scale-95 transition-transform">
             <h2 class="text-2xl font-bold text-white mb-6">Edit Album</h2>
-            <form id="edit-form"><div class="space-y-4"><div><label class="block text-sm text-gray-400">Album Title</label><input type="text" id="edit-title" required class="mt-1 block w-full bg-gray-700 rounded-md py-2 px-3 text-white"></div><div><label class="block text-sm text-gray-400">Artist Name</label><input type="text" id="edit-artist" required class="mt-1 block w-full bg-gray-700 rounded-md py-2 px-3 text-white"></div><div><label class="block text-sm text-gray-400">Image URL</label><input type="url" id="edit-image-url" required class="mt-1 block w-full bg-gray-700 rounded-md py-2 px-3 text-white"></div></div><div class="mt-8 flex justify-end space-x-4"><button type="button" class="modal-cancel py-2 px-4 bg-gray-600 rounded-lg">Cancel</button><button type="submit" class="py-2 px-4 bg-indigo-600 rounded-lg">Save</button></div></form>
+            <form id="edit-form"><div class="space-y-4"><div><label class="block text-sm text-gray-400">Album Title</label><input type="text" id="edit-title" required class="mt-1 block w-full bg-gray-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></div><div><label class="block text-sm text-gray-400">Artist Name</label><input type="text" id="edit-artist" required class="mt-1 block w-full bg-gray-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></div><div><label class="block text-sm text-gray-400">Image URL</label><div class="flex items-center space-x-2 mt-1"><input type="url" id="edit-image-url" required class="block w-full bg-gray-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"><button type="button" id="suggest-art-btn" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-md text-sm font-semibold flex items-center space-x-2 disabled:opacity-50 transition-colors">✨<span id="suggest-art-text">Suggest</span><div id="suggest-art-spinner" class="spinner hidden"></div></button></div></div></div><div class="mt-8 flex justify-end space-x-4"><button type="button" class="modal-cancel py-2 px-4 bg-gray-600 rounded-lg">Cancel</button><button type="submit" class="py-2 px-4 bg-indigo-600 rounded-lg">Save</button></div></form>
         </div>
     </div>
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 opacity-0 transition-opacity">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md transform scale-95 transition-transform">
+            <h2 id="confirm-title" class="text-2xl font-bold text-white mb-4">Are you sure?</h2>
+            <p id="confirm-message" class="text-gray-400 mb-6">This action cannot be undone.</p>
+            <div class="flex justify-end space-x-4">
+                <button id="confirm-cancel-btn" class="py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors">Cancel</button>
+                <button id="confirm-ok-btn" class="py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">Delete</button>
+            </div>
+        </div>
+    </div>
+
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- State Management ---
-        let currentView = 'grid'; // 'grid' or 'album'
+        let currentView = 'grid';
         let currentFolderId = 'root';
-        let currentAlbum = null; // { id, data }
+        let currentAlbum = null;
         let navigationStack = [{id: 'root', title: 'project_1'}];
         let contextTarget = null;
         let itemCount = 0;
         let tracksUnsubscribe = null;
+        let itemsUnsubscribe = null;
+
+        // --- App & Firebase State ---
+        let db, auth, userId, appId;
+        let itemsCollectionRef; // Will be initialized after auth
 
         // --- DOM Elements ---
         const gridView = document.getElementById('grid-view');
@@ -120,38 +157,64 @@
         const contextMenuItem = document.getElementById('context-menu-item');
         const renameModal = document.getElementById('rename-modal');
         const editModal = document.getElementById('edit-modal');
+        const confirmModal = document.getElementById('confirm-modal');
         const dropZone = document.getElementById('drop-zone');
+        const suggestArtBtn = document.getElementById('suggest-art-btn');
 
-        // --- Firebase Setup ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc",
-            authDomain: "project-1-f9e5b.firebaseapp.com",
-            projectId: "project-1-f9e5b",
-            storageBucket: "project-1-f9e5b.appspot.com",
-            messagingSenderId: "272340259942",
-            appId: "1:272340259942:web:a5a5a302342e0b4eb389a7",
-            measurementId: "G-EKL8BPFSG1"
-        };
-        let db, auth, itemsCollection;
-        
+        // --- Firebase Setup (Secure & Dynamic) ---
         async function initializeFirebase() {
+            // Use environment variables provided by the platform
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+            if (!firebaseConfig.apiKey) {
+                console.error("Firebase config is missing!");
+                // Display an error to the user in the UI
+                document.body.innerHTML = '<div class="flex items-center justify-center h-screen text-red-500">Error: Firebase configuration is missing.</div>';
+                return;
+            }
+
             const app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
-            itemsCollection = collection(db, `items`);
-            await signInAnonymously(auth);
-            onAuthStateChanged(auth, user => user && listenForItems());
+
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    // IMPORTANT: Define collection path AFTER getting the userId
+                    itemsCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/items`);
+                    listenForItems();
+                } else {
+                    // Handle sign-out or initial state
+                    if (itemsUnsubscribe) itemsUnsubscribe();
+                    itemGrid.innerHTML = ''; // Clear the grid
+                }
+            });
+
+            try {
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Authentication failed:", error);
+                document.body.innerHTML = '<div class="flex items-center justify-center h-screen text-red-500">Error: Authentication failed. Please refresh.</div>';
+            }
         }
 
         // --- Navigation & View Management ---
         function navigateTo(folderId, folderTitle) {
+            history.pushState({ view: 'grid', folderId, folderTitle }, folderTitle, `/folder/${folderId}`);
             navigationStack.push({id: folderId, title: folderTitle});
             currentFolderId = folderId;
             updateView('grid');
         }
 
         function navigateBack() {
-            if (currentView === 'album' || navigationStack.length > 1) {
+             if (currentView === 'album') {
+                history.back(); // This will trigger the popstate listener
+            } else if (navigationStack.length > 1) {
                 history.back();
             }
         }
@@ -163,20 +226,22 @@
             updateView('album');
         }
 
-        function updateView(view) {
+        function updateView(view, state = {}) {
             currentView = view;
-            if (tracksUnsubscribe) tracksUnsubscribe(); // Stop listening to old track lists
+            if (itemsUnsubscribe) { itemsUnsubscribe(); itemsUnsubscribe = null; }
+            if (tracksUnsubscribe) { tracksUnsubscribe(); tracksUnsubscribe = null; }
 
             if (view === 'grid') {
                 const currentFolder = navigationStack[navigationStack.length - 1];
+                currentFolderId = currentFolder.id;
                 headerTitle.textContent = currentFolder.title;
-                backButton.style.display = navigationStack.length > 1 ? 'block' : 'none';
+                backButton.style.display = navigationStack.length > 1 ? 'flex' : 'none';
                 gridView.classList.remove('hidden');
                 albumView.classList.add('hidden');
                 listenForItems();
             } else if (view === 'album') {
                 headerTitle.textContent = currentAlbum.data.title;
-                backButton.classList.remove('hidden');
+                backButton.style.display = 'flex';
                 gridView.classList.add('hidden');
                 albumView.classList.remove('hidden');
                 document.getElementById('album-view-cover').src = currentAlbum.data.imageUrl;
@@ -190,16 +255,19 @@
         function renderItems(docs) {
             itemGrid.innerHTML = '';
             itemCount = docs.length;
+            if (docs.length === 0) {
+                 itemGrid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10">Right-click to add your first album or folder.</div>`;
+            }
             docs.forEach(doc => {
                 const item = { id: doc.id, data: doc.data() };
                 const el = document.createElement('div');
-                el.className = 'w-48 space-y-2 cursor-pointer group item-fade-in';
+                el.className = 'w-full space-y-2 cursor-pointer group item-fade-in';
                 el.innerHTML = item.data.type === 'album' ? `
-                    <img src="${item.data.imageUrl}" class="w-full h-48 object-cover rounded-lg shadow-lg group-hover:scale-105 transition-transform" onerror="this.src='https://placehold.co/200x200/333/fff?text=Error';">
-                    <div class="text-white"><h3 class="font-bold">${item.data.title}</h3><p class="text-sm text-gray-400">${item.data.artist}</p></div>
+                    <div class="relative aspect-square"><img src="${item.data.imageUrl}" class="w-full h-full object-cover rounded-lg shadow-lg group-hover:scale-105 transition-transform" onerror="this.src='https://placehold.co/200x200/333/fff?text=Error';"></div>
+                    <div class="text-white"><h3 class="font-bold truncate">${item.data.title}</h3><p class="text-sm text-gray-400 truncate">${item.data.artist}</p></div>
                 ` : `
-                    <div class="w-full h-48 rounded-lg shadow-lg bg-gray-700 flex items-center justify-center group-hover:scale-105 transition-transform"><svg class="h-24 w-24 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg></div>
-                    <div class="text-white"><h3 class="font-bold">${item.data.title}</h3><p class="text-sm text-gray-400">Folder</p></div>
+                    <div class="relative aspect-square w-full h-full rounded-lg shadow-lg bg-gray-800 flex items-center justify-center group-hover:scale-105 transition-transform"><svg class="h-1/2 w-1/2 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg></div>
+                    <div class="text-white"><h3 class="font-bold truncate">${item.data.title}</h3><p class="text-sm text-gray-400">Folder</p></div>
                 `;
                 el.addEventListener('click', () => item.data.type === 'folder' ? navigateTo(item.id, item.data.title) : showAlbumView(item));
                 el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); contextTarget = item; showContextMenu(contextMenuItem, e.clientX, e.clientY); });
@@ -210,11 +278,16 @@
         function renderTracks(docs) {
             const trackList = document.getElementById('track-list');
             trackList.innerHTML = '';
-            document.getElementById('album-view-meta').textContent = `${docs.length} tracks`;
+            document.getElementById('album-view-meta').textContent = `${docs.length} track${docs.length !== 1 ? 's' : ''}`;
+            if (docs.length === 0) {
+                document.getElementById('drop-message').classList.remove('hidden');
+            } else {
+                 document.getElementById('drop-message').classList.add('hidden');
+            }
             docs.forEach((doc, index) => {
                 const track = doc.data();
                 const el = document.createElement('div');
-                el.className = 'flex items-center p-2 rounded-md hover:bg-gray-700 text-gray-400';
+                el.className = 'flex items-center p-2 rounded-md hover:bg-gray-700 text-gray-400 transition-colors';
                 el.innerHTML = `<div class="w-8 text-right mr-4">${index + 1}</div><div class="flex-grow text-white">${track.fileName}</div>`;
                 trackList.appendChild(el);
             });
@@ -222,112 +295,278 @@
 
         // --- Firestore Logic ---
         function listenForItems() {
-            const q = query(itemsCollection);
-            onSnapshot(q, snapshot => {
-                const filtered = snapshot.docs.filter(doc => doc.data().parentId === currentFolderId);
-                const sorted = filtered.sort((a, b) => (a.data().createdAt?.toDate() || 0) - (b.data().createdAt?.toDate() || 0));
+            if (!itemsCollectionRef) return;
+            if (itemsUnsubscribe) itemsUnsubscribe(); // Unsubscribe from previous listener
+            const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId));
+            itemsUnsubscribe = onSnapshot(q, snapshot => {
+                const sorted = snapshot.docs.sort((a, b) => (a.data().createdAt?.toDate() || 0) - (b.data().createdAt?.toDate() || 0));
                 renderItems(sorted);
-            });
+            }, error => console.error("Error listening for items:", error));
         }
 
         function listenForTracks(albumId) {
-            const tracksCollection = collection(db, `items/${albumId}/tracks`);
-            const q = query(tracksCollection);
+            if (!itemsCollectionRef) return;
+            const tracksCollectionRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
+            const q = query(tracksCollectionRef);
+            if (tracksUnsubscribe) tracksUnsubscribe();
             tracksUnsubscribe = onSnapshot(q, snapshot => {
-                 const sorted = snapshot.docs.sort((a, b) => (a.data().createdAt?.toDate() || 0) - (b.data().createdAt?.toDate() || 0));
-                 renderTracks(sorted);
-            });
+                const sorted = snapshot.docs.sort((a, b) => (a.data().createdAt?.toDate() || 0) - (b.data().createdAt?.toDate() || 0));
+                renderTracks(sorted);
+            }, error => console.error("Error listening for tracks:", error));
         }
 
         async function createItem(type) {
-            const newItemName = `project_${itemCount + 1}`;
-            const newItemData = { title: newItemName, type, parentId: currentFolderId, createdAt: new Date() };
+            if (!itemsCollectionRef) return;
+            const newItemName = `New ${type} ${itemCount + 1}`;
+            const newItemData = { title: newItemName, type, parentId: currentFolderId, createdAt: serverTimestamp() };
             if (type === 'album') {
-                newItemData.artist = 'untitled';
-                newItemData.imageUrl = `https://placehold.co/200x200/5865F2/FFFFFF?text=${newItemName.replace('_', '+')}`;
+                newItemData.artist = 'Untitled Artist';
+                newItemData.imageUrl = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(newItemName)}`;
             }
-            await addDoc(itemsCollection, newItemData);
+            await addDoc(itemsCollectionRef, newItemData);
         }
 
         async function addTrack(albumId, file) {
-            const tracksCollection = collection(db, `items/${albumId}/tracks`);
-            await addDoc(tracksCollection, { fileName: file.name, createdAt: new Date() });
+            if (!itemsCollectionRef) return;
+            const tracksCollectionRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
+            await addDoc(tracksCollectionRef, { fileName: file.name, createdAt: serverTimestamp() });
         }
 
-        async function updateItem(id, data) { await updateDoc(doc(db, `items`, id), data); }
-        async function deleteItem(id) { await deleteDoc(doc(db, `items`, id)); }
+        async function updateItem(id, data) { if(itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data); }
+        async function deleteItem(id) { if(itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id)); }
+
+        // --- Gemini API Logic ---
+        async function generateCoverArt() {
+            const title = document.getElementById('edit-title').value;
+            const artist = document.getElementById('edit-artist').value;
+            const spinner = document.getElementById('suggest-art-spinner');
+            const btnText = document.getElementById('suggest-art-text');
+
+            if (!title || !artist) {
+                showConfirmation("Missing Info", "Please enter a title and artist first.", true);
+                return;
+            }
+
+            spinner.classList.remove('hidden');
+            btnText.classList.add('hidden');
+            suggestArtBtn.disabled = true;
+
+            const prompt = `Album cover for a project titled '${title}' by the artist '${artist}'. Style: vibrant, abstract, digital art.`;
+            
+            const payload = { instances: [{ prompt }], parameters: { "sampleCount": 1 } };
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+
+            try {
+                let response;
+                let retries = 0;
+                let delay = 1000;
+                while (retries < 5) {
+                    response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) break; 
+                    if (response.status === 429 || response.status >= 500) {
+                        retries++;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2;
+                    } else {
+                        throw new Error(`API Error: ${response.statusText}`);
+                    }
+                }
+
+                if (!response || !response.ok) {
+                    throw new Error('Failed to generate image after several retries.');
+                }
+
+                const result = await response.json();
+                if (result.predictions && result.predictions[0]?.bytesBase64Encoded) {
+                    const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                    document.getElementById('edit-image-url').value = imageUrl;
+                } else {
+                    throw new Error("No image data in API response.");
+                }
+            } catch (error) {
+                console.error("Error generating cover art:", error);
+                showConfirmation("Generation Failed", "Sorry, couldn't generate cover art. Please try again.", true);
+            } finally {
+                spinner.classList.add('hidden');
+                btnText.classList.remove('hidden');
+                suggestArtBtn.disabled = false;
+            }
+        }
 
         // --- UI (Menus & Modals) ---
         function showContextMenu(menu, x, y) {
             hideAllContextMenus();
-            menu.style.left = `${x}px`; menu.style.top = `${y}px`;
+            // Disable edit button for folders
+            if(menu === contextMenuItem) {
+                const editBtn = document.getElementById('edit-btn');
+                editBtn.disabled = contextTarget.data.type === 'folder';
+            }
+            
+            // Boundary checks
+            const menuWidth = menu.offsetWidth;
+            const menuHeight = menu.offsetHeight;
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+
+            if (x + menuWidth > screenWidth) {
+                x = screenWidth - menuWidth - 10;
+            }
+             if (y + menuHeight > screenHeight) {
+                y = screenHeight - menuHeight - 10;
+            }
+
+            menu.style.left = `${x}px`;
+            menu.style.top = `${y}px`;
             menu.classList.remove('hidden');
             setTimeout(() => menu.classList.remove('opacity-0', 'scale-95'), 10);
         }
+
         function hideAllContextMenus() { [contextMenuBg, contextMenuItem].forEach(m => { m.classList.add('opacity-0', 'scale-95'); setTimeout(() => m.classList.add('hidden'), 200); }); }
-        function showModal(modal, target) {
+        
+        function showModal(modal) {
             modal.classList.remove('hidden');
-            const form = modal.querySelector('form');
-            if (modal === renameModal) form.querySelector('#rename-input').value = target.data.title;
-            else if (modal === editModal) {
-                form.querySelector('#edit-title').value = target.data.title;
-                form.querySelector('#edit-artist').value = target.data.artist;
-                form.querySelector('#edit-image-url').value = target.data.imageUrl;
-            }
-            setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10);
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('div').classList.remove('scale-95');
+            }, 10);
         }
-        function hideAllModals() { [renameModal, editModal].forEach(m => { m.classList.add('opacity-0'); m.querySelector('div').classList.add('scale-95'); setTimeout(() => m.classList.add('hidden'), 200); }); }
+
+        function hideModal(modal) {
+            modal.classList.add('opacity-0');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        }
+
+        function showConfirmation(title, message, isAlert = false) {
+            return new Promise((resolve) => {
+                const confirmTitle = document.getElementById('confirm-title');
+                const confirmMessage = document.getElementById('confirm-message');
+                const okBtn = document.getElementById('confirm-ok-btn');
+                const cancelBtn = document.getElementById('confirm-cancel-btn');
+
+                confirmTitle.textContent = title;
+                confirmMessage.textContent = message;
+
+                if(isAlert) {
+                    okBtn.textContent = 'OK';
+                    okBtn.className = 'py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors';
+                    cancelBtn.classList.add('hidden');
+                } else {
+                    okBtn.textContent = 'Delete';
+                    okBtn.className = 'py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors';
+                    cancelBtn.classList.remove('hidden');
+                }
+
+                showModal(confirmModal);
+
+                const okHandler = () => {
+                    hideModal(confirmModal);
+                    resolve(true);
+                    cleanup();
+                };
+                const cancelHandler = () => {
+                    hideModal(confirmModal);
+                    resolve(false);
+                    cleanup();
+                };
+
+                function cleanup() {
+                    okBtn.removeEventListener('click', okHandler);
+                    cancelBtn.removeEventListener('click', cancelHandler);
+                }
+
+                okBtn.addEventListener('click', okHandler, { once: true });
+                cancelBtn.addEventListener('click', cancelHandler, { once: true });
+            });
+        }
 
         // --- Event Listeners ---
         window.addEventListener('popstate', (event) => {
             if (event.state) {
-                if (event.state.view === 'album') {
-                    // This logic needs to be improved to re-fetch album data if needed
-                    updateView('album');
-                } else {
-                    navigationStack.pop();
-                    currentFolderId = event.state.folderId;
-                    updateView('grid');
-                }
+                 if (currentView === 'album') {
+                    navigationStack.pop(); // remove album "view" from stack
+                 }
+                navigationStack.pop();
+                if (navigationStack.length === 0) navigationStack.push({id: 'root', title: 'project_1'});
+                updateView('grid');
             } else {
-                // Initial state
+                // This case handles going back to the initial state
                 navigationStack = [{id: 'root', title: 'project_1'}];
-                currentFolderId = 'root';
                 updateView('grid');
             }
         });
 
         document.getElementById('grid-view').addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showContextMenu(contextMenuBg, e.clientX, e.clientY); });
-        window.addEventListener('click', hideAllContextMenus);
-        backButton.addEventListener('click', navigateBack);
-        
-        // Drag and Drop for tracks
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false));
-        ['dragenter', 'dragover'].forEach(eventName => dropZone.addEventListener(eventName, () => dropZone.classList.add('bg-gray-700'), false));
-        ['dragleave', 'drop'].forEach(eventName => dropZone.addEventListener(eventName, () => dropZone.classList.remove('bg-gray-700'), false));
-        dropZone.addEventListener('drop', e => {
-            for (const file of e.dataTransfer.files) {
-                if (file.type.startsWith('audio/')) {
-                    addTrack(currentAlbum.id, file);
-                }
+        window.addEventListener('mousedown', (event) => {
+            // Check if the click is on a context menu or a child of a context menu
+            const isInsideMenu = [contextMenuBg, contextMenuItem].some(menu => menu.contains(event.target));
+            
+            // If the click is outside all menus, hide them
+            if (!isInsideMenu) {
+                hideAllContextMenus();
             }
         });
 
-        // Menu Buttons
-        document.getElementById('add-album-btn').addEventListener('click', e => { e.preventDefault(); createItem('album'); });
-        document.getElementById('add-folder-btn').addEventListener('click', e => { e.preventDefault(); createItem('folder'); });
-        document.getElementById('rename-btn').addEventListener('click', e => { e.preventDefault(); showModal(renameModal, contextTarget); });
-        document.getElementById('edit-btn').addEventListener('click', e => { e.preventDefault(); if(contextTarget.data.type === 'album') showModal(editModal, contextTarget); else alert("Can only edit folders."); });
-        document.getElementById('delete-btn').addEventListener('click', e => { e.preventDefault(); if(confirm('Are you sure?')) deleteItem(contextTarget.id); });
 
-        // Modal Forms
-        document.getElementById('rename-form').addEventListener('submit', e => { e.preventDefault(); const newTitle = document.getElementById('rename-input').value; if (newTitle) updateItem(contextTarget.id, { title: newTitle }); hideAllModals(); });
-        document.getElementById('edit-form').addEventListener('submit', e => { e.preventDefault(); const newData = { title: document.getElementById('edit-title').value, artist: document.getElementById('edit-artist').value, imageUrl: document.getElementById('edit-image-url').value }; if (newData.title && newData.artist && newData.imageUrl) updateItem(contextTarget.id, newData); hideAllModals(); });
-        document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', hideAllModals));
+        backButton.addEventListener('click', navigateBack);
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, false));
+        ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.add('bg-gray-700', 'border-indigo-500'), false));
+        ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove('bg-gray-700', 'border-indigo-500'), false));
+        dropZone.addEventListener('drop', e => {
+            for (const file of e.dataTransfer.files) { if (file.type.startsWith('audio/')) { addTrack(currentAlbum.id, file); } }
+        });
+
+        document.getElementById('add-album-btn').addEventListener('click', e => { e.preventDefault(); createItem('album'); hideAllContextMenus(); });
+        document.getElementById('add-folder-btn').addEventListener('click', e => { e.preventDefault(); createItem('folder'); hideAllContextMenus(); });
+        
+        document.getElementById('rename-btn').addEventListener('click', e => { 
+            e.preventDefault(); 
+            document.getElementById('rename-input').value = contextTarget.data.title;
+            showModal(renameModal); 
+            hideAllContextMenus(); 
+        });
+        
+        document.getElementById('edit-btn').addEventListener('click', e => { 
+            e.preventDefault(); 
+            if(contextTarget.data.type === 'album') {
+                document.getElementById('edit-title').value = contextTarget.data.title;
+                document.getElementById('edit-artist').value = contextTarget.data.artist;
+                document.getElementById('edit-image-url').value = contextTarget.data.imageUrl;
+                showModal(editModal);
+            }
+            hideAllContextMenus(); 
+        });
+
+        document.getElementById('delete-btn').addEventListener('click', async (e) => {
+            e.preventDefault();
+            hideAllContextMenus();
+            const confirmed = await showConfirmation('Delete Item?', `You are about to delete "${contextTarget.data.title}". This cannot be undone.`);
+            if (confirmed) {
+                deleteItem(contextTarget.id);
+            }
+        });
+        
+        suggestArtBtn.addEventListener('click', generateCoverArt);
+
+        document.getElementById('rename-form').addEventListener('submit', e => { e.preventDefault(); const newTitle = document.getElementById('rename-input').value; if (newTitle) updateItem(contextTarget.id, { title: newTitle }); hideModal(renameModal); });
+        document.getElementById('edit-form').addEventListener('submit', e => { e.preventDefault(); const newData = { title: document.getElementById('edit-title').value, artist: document.getElementById('edit-artist').value, imageUrl: document.getElementById('edit-image-url').value }; if (newData.title && newData.artist && newData.imageUrl) updateItem(contextTarget.id, newData); hideModal(editModal); });
+        
+        document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => {
+            hideModal(renameModal);
+            hideModal(editModal);
+        }));
+        document.getElementById('confirm-cancel-btn').addEventListener('click', () => hideModal(confirmModal));
 
         // --- Initialize ---
         initializeFirebase();
-        history.replaceState({ view: 'grid', folderId: 'root' }, 'project_1', '/');
+        history.replaceState({ view: 'grid', folderId: 'root', title: 'project_1' }, 'project_1', '/');
         updateView('grid');
 
     </script>
