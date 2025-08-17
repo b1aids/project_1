@@ -1,360 +1,728 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Project_1</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+
     <style>
+
         body {
+
             font-family: 'Inter', sans-serif;
+
             background-color: #202225;
+
         }
+
         /* Smooth transitions for all elements */
+
         .transition-all { transition: all 0.2s ease-in-out; }
+
         .transition-opacity { transition: opacity 0.2s ease-in-out; }
+
         .transition-transform { transition: transform 0.2s ease-in-out; }
 
+
+
         /* Animation for items appearing in the grid */
+
         @keyframes fadeIn {
+
             from { opacity: 0; transform: translateY(10px); }
+
             to { opacity: 1; transform: translateY(0); }
+
         }
+
         .item-fade-in {
+
             animation: fadeIn 0.3s ease-in-out forwards;
+
         }
+
         
+
         /* Hide scrollbar but allow scrolling */
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
+
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
     </style>
+
 </head>
+
 <body class="text-gray-300 antialiased">
 
+
+
     <div id="app-container" class="flex flex-col h-screen">
+
         <!-- Header -->
+
         <header class="flex items-center justify-between p-4 w-full flex-shrink-0">
+
             <div class="flex items-center space-x-4">
+
                  <button id="back-button" class="p-2 rounded-full hover:bg-gray-700 hidden">
+
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+
                 </button>
+
                 <h1 id="header-title" class="text-xl font-bold text-white">project_1</h1>
+
             </div>
+
             <div class="flex items-center space-x-4">
+
                 <button class="p-2 rounded-full hover:bg-gray-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></button>
+
                 <button class="p-2 rounded-full hover:bg-gray-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></button>
+
             </div>
+
         </header>
 
+
+
         <!-- Grid View -->
+
         <main id="grid-view" class="flex-grow p-8 overflow-y-auto no-scrollbar">
+
             <div id="item-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-8">
+
                 <!-- Items will be loaded here -->
+
             </div>
+
         </main>
+
+
 
         <!-- Room View (for video playback) -->
+
         <main id="room-view" class="hidden flex-grow flex-col items-center justify-center h-full p-4 bg-[#3D3D3D]">
+
              <div id="video-container" class="w-full h-full bg-black rounded-lg shadow-2xl flex items-center justify-center relative group transition-all border-4 border-transparent">
+
                 <div class="text-center p-8">
+
                     <h2 class="mt-4 text-2xl font-bold text-gray-300">Drag & Drop Media File</h2>
+
                 </div>
+
                 <video id="player" class="w-full h-full object-contain rounded-lg hidden"></video>
+
             </div>
+
         </main>
+
     </div>
+
+
 
     <!-- Context Menus -->
+
     <div id="context-menu-bg" class="fixed bg-gray-800 text-white w-56 rounded-md shadow-xl py-2 z-50 hidden opacity-0 transform scale-95 transition-all">
+
         <a href="#" id="add-album-btn" class="flex items-center px-4 py-2 text-sm hover:bg-indigo-600 rounded-md m-1 transition-colors">+ Add Album</a>
+
         <a href="#" id="add-folder-btn" class="flex items-center px-4 py-2 text-sm hover:bg-indigo-600 rounded-md m-1 transition-colors">+ Add Folder</a>
+
     </div>
+
     <div id="context-menu-item" class="fixed bg-gray-800 text-white w-56 rounded-md shadow-xl py-2 z-50 hidden opacity-0 transform scale-95 transition-all">
+
         <a href="#" id="rename-btn" class="flex items-center px-4 py-2 text-sm hover:bg-indigo-600 rounded-md m-1 transition-colors">Rename</a>
+
         <a href="#" id="edit-btn" class="flex items-center px-4 py-2 text-sm hover:bg-indigo-600 rounded-md m-1 transition-colors">Edit</a>
+
         <div class="border-t border-gray-700 my-1"></div>
+
         <a href="#" id="delete-btn" class="flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-500 hover:text-white rounded-md m-1 transition-colors">Delete</a>
+
     </div>
+
+
 
     <!-- Modals -->
+
     <div id="rename-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 opacity-0 transition-opacity">
+
         <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md transform scale-95 transition-transform">
+
             <h2 class="text-2xl font-bold text-white mb-6">Rename Item</h2>
+
             <form id="rename-form">
+
                 <input type="text" id="rename-input" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+
                 <div class="mt-8 flex justify-end space-x-4">
+
                     <button type="button" class="modal-cancel py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white font-semibold rounded-lg">Cancel</button>
+
                     <button type="submit" class="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg">Save</button>
+
                 </div>
+
             </form>
+
         </div>
+
     </div>
+
     <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 opacity-0 transition-opacity">
+
         <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md transform scale-95 transition-transform">
+
             <h2 class="text-2xl font-bold text-white mb-6">Edit Album</h2>
+
             <form id="edit-form">
+
                 <div class="space-y-4">
+
                     <div>
+
                         <label class="block text-sm font-medium text-gray-400">Album Title</label>
+
                         <input type="text" id="edit-title" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white">
+
                     </div>
+
                     <div>
+
                         <label class="block text-sm font-medium text-gray-400">Artist Name</label>
+
                         <input type="text" id="edit-artist" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white">
+
                     </div>
+
                     <div>
+
                         <label class="block text-sm font-medium text-gray-400">Image URL (paste a link to an image/GIF)</label>
+
                         <input type="url" id="edit-image-url" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white">
+
                     </div>
+
                 </div>
+
                 <div class="mt-8 flex justify-end space-x-4">
+
                     <button type="button" class="modal-cancel py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white font-semibold rounded-lg">Cancel</button>
+
                     <button type="submit" class="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg">Save</button>
+
                 </div>
+
             </form>
+
         </div>
+
     </div>
+
+
 
     <script type="module">
+
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+
+
         // --- State Management ---
+
         let currentFolderId = 'root';
+
         let navigationStack = [{id: 'root', title: 'project_1'}];
+
         let contextTarget = null; // { id, type, data }
+
         let itemCount = 0;
 
+
+
         // --- DOM Elements ---
+
         const gridView = document.getElementById('grid-view');
+
         const roomView = document.getElementById('room-view');
+
         const itemGrid = document.getElementById('item-grid');
+
         const headerTitle = document.getElementById('header-title');
+
         const backButton = document.getElementById('back-button');
+
         // Context Menus
+
         const contextMenuBg = document.getElementById('context-menu-bg');
+
         const contextMenuItem = document.getElementById('context-menu-item');
+
         // Modals
+
         const renameModal = document.getElementById('rename-modal');
+
         const editModal = document.getElementById('edit-modal');
 
+
+
         // --- Firebase Setup ---
+
         let db, auth;
+
         let itemsCollection;
+
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc",
+            authDomain: "project-1-f9e5b.firebaseapp.com",
+            projectId: "project-1-f9e5b",
+            storageBucket: "project-1-f9e5b.firebasestorage.app",
+            messagingSenderId: "272340259942",
+            appId: "1:272340259942:web:a5a5a302342e0b4eb389a7",
+            measurementId: "G-EKL8BPFSG1"
+            };
+
+
 
         async function initializeFirebase() {
+
             if (!Object.keys(firebaseConfig).length) return;
+
             const app = initializeApp(firebaseConfig);
+
             db = getFirestore(app);
+
             auth = getAuth(app);
+
             itemsCollection = collection(db, `/artifacts/${appId}/public/data/items`);
+
             
+
             if (typeof __initial_auth_token !== 'undefined') await signInWithCustomToken(auth, __initial_auth_token);
+
             else await signInAnonymously(auth);
 
+
+
             onAuthStateChanged(auth, user => user && listenForItems());
+
         }
+
+
 
         // --- Navigation & View Management ---
+
         function navigateTo(folderId, folderTitle) {
+
             navigationStack.push({id: folderId, title: folderTitle});
+
             currentFolderId = folderId;
+
             updateView();
+
         }
+
+
 
         function navigateBack() {
+
             if (navigationStack.length <= 1) return;
+
             navigationStack.pop();
+
             const previous = navigationStack[navigationStack.length - 1];
+
             currentFolderId = previous.id;
+
             updateView();
+
         }
+
+
 
         function showRoomView(album) {
+
             history.pushState({view: 'room', albumId: album.id}, album.data.title);
+
             gridView.classList.add('hidden');
+
             roomView.classList.remove('hidden');
+
             headerTitle.textContent = album.data.title;
+
             backButton.classList.remove('hidden');
+
         }
+
+
 
         function updateView() {
+
             const current = navigationStack[navigationStack.length - 1];
+
             history.pushState({view: 'grid', folderId: current.id}, current.title);
+
             gridView.classList.remove('hidden');
+
             roomView.classList.add('hidden');
+
             headerTitle.textContent = current.title;
+
             backButton.style.display = navigationStack.length > 1 ? 'block' : 'none';
+
             listenForItems();
+
         }
+
         
+
         // --- Data Rendering ---
+
         function renderItems(docs) {
+
             itemGrid.innerHTML = '';
+
             itemCount = docs.length;
+
             docs.forEach(doc => {
+
                 const item = { id: doc.id, data: doc.data() };
+
                 const itemElement = document.createElement('div');
+
                 itemElement.className = 'w-48 space-y-2 cursor-pointer group item-fade-in';
+
                 itemElement.dataset.id = item.id;
+
                 itemElement.dataset.type = item.data.type;
 
+
+
                 const template = item.data.type === 'album' ? `
+
                     <img src="${item.data.imageUrl}" class="w-full h-48 object-cover rounded-lg shadow-lg group-hover:scale-105 transition-transform" onerror="this.src='https://placehold.co/200x200/333/fff?text=Error';">
+
                     <div class="text-white"><h3 class="font-bold">${item.data.title}</h3><p class="text-sm text-gray-400">${item.data.artist}</p></div>
+
                 ` : `
+
                     <div class="w-full h-48 rounded-lg shadow-lg bg-gray-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+
                         <svg class="h-24 w-24 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+
                     </div>
+
                     <div class="text-white"><h3 class="font-bold">${item.data.title}</h3><p class="text-sm text-gray-400">Folder</p></div>
+
                 `;
+
                 itemElement.innerHTML = template;
+
                 
+
                 itemElement.addEventListener('click', () => handleItemClick(item));
+
                 itemElement.addEventListener('contextmenu', (e) => {
+
                     e.preventDefault(); e.stopPropagation();
+
                     contextTarget = item;
+
                     showContextMenu(contextMenuItem, e.clientX, e.clientY);
+
                 });
+
                 itemGrid.appendChild(itemElement);
+
             });
+
         }
+
+
 
         // --- Event Handlers ---
+
         function handleItemClick(item) {
+
             if (item.data.type === 'folder') {
+
                 navigateTo(item.id, item.data.title);
+
             } else {
+
                 showRoomView(item);
+
             }
+
         }
+
+
 
         // --- Firestore Logic ---
+
         function listenForItems() {
+
             if (!itemsCollection) return;
+
             // FIX: Query the entire collection and filter client-side to avoid potential
+
             // security rule issues with 'where' clauses.
+
             const q = query(itemsCollection);
+
             onSnapshot(q, snapshot => {
+
                 // Filter documents by the current folder's ID on the client side.
+
                 const filteredDocs = snapshot.docs.filter(doc => doc.data().parentId === currentFolderId);
 
+
+
                 // Sort documents by createdAt timestamp on the client side.
+
                 const sortedDocs = filteredDocs.sort((a, b) => {
+
                     const timeA = a.data().createdAt?.toDate() || 0;
+
                     const timeB = b.data().createdAt?.toDate() || 0;
+
                     return timeA - timeB;
+
                 });
+
                 renderItems(sortedDocs);
+
             }, console.error);
+
         }
+
+
 
         async function createItem(type) {
+
             const newItemName = `project_${itemCount + 1}`;
+
             const newItemData = {
+
                 title: newItemName, type, parentId: currentFolderId, createdAt: new Date()
+
             };
+
             if (type === 'album') {
+
                 newItemData.artist = 'untitled';
+
                 newItemData.imageUrl = `https://placehold.co/200x200/5865F2/FFFFFF?text=${newItemName.replace('_', '+')}`;
+
             }
+
             await addDoc(itemsCollection, newItemData);
+
         }
+
+
 
         async function updateItem(id, data) {
+
             const itemRef = doc(db, `/artifacts/${appId}/public/data/items`, id);
+
             await updateDoc(itemRef, data);
+
         }
+
+
 
         async function deleteItem(id) {
+
             const itemRef = doc(db, `/artifacts/${appId}/public/data/items`, id);
+
             await deleteDoc(itemRef);
+
         }
+
+
 
         // --- UI (Menus & Modals) ---
+
         function showContextMenu(menu, x, y) {
+
             hideAllContextMenus();
+
             menu.style.left = `${x}px`; menu.style.top = `${y}px`;
+
             menu.classList.remove('hidden');
+
             setTimeout(() => menu.classList.remove('opacity-0', 'scale-95'), 10);
+
         }
+
+
 
         function hideAllContextMenus() {
+
             [contextMenuBg, contextMenuItem].forEach(m => {
+
                 m.classList.add('opacity-0', 'scale-95');
+
                 setTimeout(() => m.classList.add('hidden'), 200);
+
             });
+
         }
+
+
 
         function showModal(modal, target) {
+
             modal.classList.remove('hidden');
+
             const form = modal.querySelector('form');
+
             if (modal === renameModal) {
+
                 form.querySelector('#rename-input').value = target.data.title;
+
             } else if (modal === editModal) {
+
                 form.querySelector('#edit-title').value = target.data.title;
+
                 form.querySelector('#edit-artist').value = target.data.artist;
+
                 form.querySelector('#edit-image-url').value = target.data.imageUrl;
+
             }
+
             setTimeout(() => {
+
                 modal.classList.remove('opacity-0');
+
                 modal.querySelector('div').classList.remove('scale-95');
+
             }, 10);
+
         }
+
+
 
         function hideAllModals() {
+
             [renameModal, editModal].forEach(m => {
+
                 m.classList.add('opacity-0');
+
                 m.querySelector('div').classList.add('scale-95');
+
                 setTimeout(() => m.classList.add('hidden'), 200);
+
             });
+
         }
 
+
+
         // --- Event Listeners ---
+
         document.getElementById('grid-view').addEventListener('contextmenu', (e) => {
+
             e.preventDefault(); showContextMenu(contextMenuBg, e.clientX, e.clientY);
+
         });
+
         window.addEventListener('click', hideAllContextMenus);
+
         backButton.addEventListener('click', navigateBack);
 
+
+
         // Menu Buttons
+
         document.getElementById('add-album-btn').addEventListener('click', (e) => { e.preventDefault(); createItem('album'); });
+
         document.getElementById('add-folder-btn').addEventListener('click', (e) => { e.preventDefault(); createItem('folder'); });
+
         document.getElementById('rename-btn').addEventListener('click', (e) => { e.preventDefault(); showModal(renameModal, contextTarget); });
+
         document.getElementById('edit-btn').addEventListener('click', (e) => {
+
              e.preventDefault();
+
              if(contextTarget.data.type === 'album') showModal(editModal, contextTarget);
+
              else alert("Can only edit albums.");
+
         });
+
         document.getElementById('delete-btn').addEventListener('click', (e) => { e.preventDefault(); if(confirm('Are you sure?')) deleteItem(contextTarget.id); });
 
+
+
         // Modal Forms
+
         document.getElementById('rename-form').addEventListener('submit', (e) => {
+
             e.preventDefault();
+
             const newTitle = document.getElementById('rename-input').value;
+
             if (newTitle) updateItem(contextTarget.id, { title: newTitle });
+
             hideAllModals();
+
         });
+
         document.getElementById('edit-form').addEventListener('submit', (e) => {
+
             e.preventDefault();
+
             const newData = {
+
                 title: document.getElementById('edit-title').value,
+
                 artist: document.getElementById('edit-artist').value,
+
                 imageUrl: document.getElementById('edit-image-url').value,
+
             };
+
             if (newData.title && newData.artist && newData.imageUrl) updateItem(contextTarget.id, newData);
+
             hideAllModals();
+
         });
+
         document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', hideAllModals));
 
+
+
         // --- Initialize ---
+
         initializeFirebase();
+
         updateView();
 
+
+
     </script>
+
 </body>
+
 </html>
+
