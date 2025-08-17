@@ -289,7 +289,7 @@
                 if (user) {
                     window.userId = user.uid;
                     window.itemsCollectionRef = collection(db, `users/${userId}/items`);
-                    listenForItems();
+                    initializeAppState(); // Initialize app state after auth
                 } else {
                     if (itemsUnsubscribe) itemsUnsubscribe();
                     itemGrid.innerHTML = '';
@@ -497,12 +497,26 @@
         function hideModal(modal) { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); }
         function showConfirmation(title, message, isAlert = false) { return new Promise((resolve) => { const confirmTitle = document.getElementById('confirm-title'), confirmMessage = document.getElementById('confirm-message'), okBtn = document.getElementById('confirm-ok-btn'), cancelBtn = document.getElementById('confirm-cancel-btn'); confirmTitle.textContent = title; confirmMessage.textContent = message; if(isAlert) { okBtn.textContent = 'OK'; okBtn.className = 'py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors'; cancelBtn.classList.add('hidden'); } else { okBtn.textContent = 'Delete'; okBtn.className = 'py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors'; cancelBtn.classList.remove('hidden'); } showModal(confirmModal); const okHandler = () => { hideModal(confirmModal); resolve(true); cleanup(); }; const cancelHandler = () => { hideModal(confirmModal); resolve(false); cleanup(); }; function cleanup() { okBtn.removeEventListener('click', okHandler); cancelBtn.removeEventListener('click', cancelHandler); } okBtn.addEventListener('click', okHandler, { once: true }); cancelBtn.addEventListener('click', cancelHandler, { once: true }); }); }
 
+        // --- State Persistence ---
+        function saveState() {
+            const state = {
+                navigationStack: navigationStack,
+                currentAlbum: currentAlbum ? { id: currentAlbum.id, data: currentAlbum.data } : null,
+                player: currentTrackIndex > -1 ? {
+                    playlist: currentPlaylist,
+                    trackIndex: currentTrackIndex,
+                    currentTime: audio.currentTime
+                } : null
+            };
+            localStorage.setItem('project1_state', JSON.stringify(state));
+        }
+
         // --- Event Listeners ---
         window.addEventListener('popstate', (event) => {
             if (event.state) {
                 const lastState = navigationStack[navigationStack.length - 1];
                 if (lastState && lastState.id !== event.state.folderId && lastState.id !== event.state.albumId) {
-                     navigationStack.pop();
+                    navigationStack.pop();
                 }
                 updateView('grid');
             } else {
@@ -510,6 +524,8 @@
                 updateView('grid');
             }
         });
+
+        window.addEventListener('beforeunload', saveState);
 
         document.getElementById('grid-view').addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showContextMenu(contextMenuBg, e.clientX, e.clientY); });
         backButton.addEventListener('click', navigateBack);
@@ -566,9 +582,65 @@
         document.getElementById('confirm-cancel-btn').addEventListener('click', () => hideModal(confirmModal));
 
         // --- Initialize ---
+        function initializeAppState() {
+            const savedStateJSON = localStorage.getItem('project1_state');
+            if (savedStateJSON) {
+                try {
+                    const savedState = JSON.parse(savedStateJSON);
+
+                    // Restore navigation and view state first
+                    if (savedState.navigationStack) {
+                        navigationStack = savedState.navigationStack;
+                    }
+                    
+                    const lastNav = navigationStack[navigationStack.length - 1];
+                    
+                    // Restore player state if available
+                    if (savedState.player) {
+                        currentPlaylist = savedState.player.playlist;
+                        currentTrackIndex = savedState.player.trackIndex;
+                        const track = currentPlaylist[currentTrackIndex];
+                        
+                        audio.src = track.fileUrl;
+                        audio.addEventListener('loadedmetadata', () => {
+                            audio.currentTime = savedState.player.currentTime;
+                            // Update time display and progress bar after setting time
+                            if (audio.duration) {
+                                currentTimeEl.textContent = formatTime(audio.currentTime);
+                                totalTimeEl.textContent = formatTime(audio.duration);
+                                const progressPercent = (audio.currentTime / audio.duration) * 100;
+                                progressBar.style.width = `${progressPercent}%`;
+                            }
+                        }, { once: true });
+
+                        updatePlayerUI(track);
+                        playerBar.classList.add('visible');
+                        updatePlayPauseIcon(); // Show paused state
+                    }
+
+                    // Restore the correct view
+                    if (lastNav.type === 'album' && savedState.currentAlbum) {
+                        currentAlbum = savedState.currentAlbum;
+                        history.replaceState({ view: 'album', albumId: currentAlbum.id, folderId: currentFolderId }, currentAlbum.data.title, location.pathname);
+                        updateView('album');
+                    } else {
+                        history.replaceState({ view: 'grid', folderId: lastNav.id, title: lastNav.title }, lastNav.title, location.pathname);
+                        updateView('grid');
+                    }
+                    return; // Exit after loading state
+
+                } catch (error) {
+                    console.error("Failed to restore state:", error);
+                    localStorage.removeItem('project1_state');
+                }
+            }
+
+            // Default initialization if no state or failed to load
+            history.replaceState({ view: 'grid', folderId: 'root', title: 'project_1' }, 'project_1', './');
+            updateView('grid');
+        }
+
         initializeFirebase();
-        history.replaceState({ view: 'grid', folderId: 'root', title: 'project_1' }, 'project_1', './');
-        updateView('grid');
     </script>
 </body>
 </html>
