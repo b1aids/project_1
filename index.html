@@ -378,7 +378,10 @@
         const provider = new GoogleAuthProvider();
 
         function signIn() {
-            signInWithPopup(auth, provider).catch(error => {
+            signInWithPopup(auth, provider).then(() => {
+                // Reload the page on successful sign-in to re-initialize everything
+                window.location.reload();
+            }).catch(error => {
                 console.error("Sign in error:", error);
             });
         }
@@ -880,7 +883,8 @@
         document.getElementById('edit-form').addEventListener('submit', e => { e.preventDefault(); const newData = { title: document.getElementById('edit-title').value, artist: document.getElementById('edit-artist').value, imageUrl: document.getElementById('edit-image-url').value }; if (newData.title && newData.artist && newData.imageUrl) updateItem(contextTarget.id, newData); hideModal(editModal); });
         document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => { hideModal(renameModal); hideModal(editModal); }));
         document.getElementById('confirm-cancel-btn').addEventListener('click', () => hideModal(confirmModal));
-        document.getElementById('settings-close-btn').addEventListener('click', () => hideModal(settingsModal));
+        const settingsCloseBtn = document.getElementById('settings-close-btn');
+        settingsCloseBtn.addEventListener('click', () => hideModal(settingsModal));
 
         // --- Initialize ---
         function initializeAppState() {
