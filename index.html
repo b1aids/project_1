@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project_1</title>
     <!-- Favicon for the site -->
-    <link rel="icon" type="image/png" href="./img/logo.png">
+    <link rel="icon" type="image/png" href="https://placehold.co/32x32/5865F2/FFFFFF?text=P1">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -126,7 +126,7 @@
                     <div class="w-full md:w-2/3 lg:w-3/4">
                         <div id="track-list" class="space-y-1"></div>
                         <div id="drop-zone" class="mt-4 text-center p-8 border-2 border-dashed border-gray-700 rounded-lg transition-all cursor-pointer hover:bg-gray-800 hover:border-indigo-500">
-                            <p id="drop-message" class="text-gray-500">Drag & Drop Audio Files Here or Click to Upload</p>
+                            <p class="text-gray-500">Drag & Drop Audio Files Here or Click to Upload</p>
                             <input type="file" id="audio-upload" accept="audio/*" class="hidden" multiple>
                         </div>
                     </div>
@@ -220,48 +220,12 @@
             </div>
         </div>
     </div>
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 opacity-0 transition-opacity">
-        <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md transform scale-95 transition-transform">
-            <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-bold text-white">Settings</h2>
-                <button id="settings-close-btn" class="p-2 rounded-full hover:bg-gray-700">&times;</button>
-            </div>
-            
-            <div class="flex items-center space-x-4 mb-6">
-                <img id="settings-pfp" src="" class="w-16 h-16 rounded-full">
-                <div>
-                    <h3 id="settings-username" class="text-xl font-bold text-white"></h3>
-                    <p class="text-gray-400">User Profile</p>
-                </div>
-            </div>
-
-            <div class="space-y-4">
-                <h4 class="text-lg font-semibold text-white border-b border-gray-700 pb-2">Connections</h4>
-                <div id="drive-connect-status" class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                    <span class="font-semibold">Google Drive</span>
-                    <button id="connect-drive-btn" class="py-1 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg">Connect</button>
-                </div>
-                <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                    <span class="font-semibold">Discord</span>
-                    <button id="connect-discord-btn" class="py-1 px-3 bg-gray-600 text-gray-400 text-sm rounded-lg cursor-not-allowed" disabled>Coming Soon</button>
-                </div>
-            </div>
-
-            <div class="mt-8 flex justify-end">
-                <button id="sign-out-btn" class="py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg">Sign Out</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Google API Client Libraries -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- State Management ---
         let currentView = 'grid', currentFolderId = 'root', currentAlbum = null;
@@ -269,7 +233,6 @@
         let itemCount = 0;
         let tracksUnsubscribe = null, itemsUnsubscribe = null;
         let currentItemDocs = []; // To store current items for duplicate checks
-        let isDriveConnected = false;
         
         // --- Player State ---
         const audio = new Audio();
@@ -279,19 +242,12 @@
         let isShuffle = false;
         let isLoop = false;
 
-        // --- Google API State ---
-        let gapiLoaded = false;
-        let gisLoaded = false;
-        let tokenClient;
-        const CLIENT_ID = '272340259942-5373s4d41405sou465aukk7l5r9mnf43.apps.googleusercontent.com'; // Replace with your client ID
-        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-
         // --- DOM Elements ---
         const gridView = document.getElementById('grid-view'), albumView = document.getElementById('album-view');
         const itemGrid = document.getElementById('item-grid');
         const headerTitle = document.getElementById('header-title'), backButton = document.getElementById('back-button');
         const contextMenuBg = document.getElementById('context-menu-bg'), contextMenuItem = document.getElementById('context-menu-item'), contextMenuTrack = document.getElementById('context-menu-track');
-        const renameModal = document.getElementById('rename-modal'), editModal = document.getElementById('edit-modal'), confirmModal = document.getElementById('confirm-modal'), settingsModal = document.getElementById('settings-modal');
+        const renameModal = document.getElementById('rename-modal'), editModal = document.getElementById('edit-modal'), confirmModal = document.getElementById('confirm-modal');
         const dropZone = document.getElementById('drop-zone');
         const audioUpload = document.getElementById('audio-upload');
         const suggestArtBtn = document.getElementById('suggest-art-btn');
@@ -310,52 +266,33 @@
         const currentTimeEl = document.getElementById('current-time');
         const totalTimeEl = document.getElementById('total-time');
         const userProfileDiv = document.getElementById('user-profile');
-        const connectDriveBtn = document.getElementById('connect-drive-btn');
-        const driveConnectStatus = document.getElementById('drive-connect-status');
         
         // --- Firebase Setup ---
         async function initializeFirebase() {
-            // Check for required global variables for the Canvas environment
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const firebaseConfig = {
-                apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc",
-                authDomain: "project-1-f9e5b.firebaseapp.com",
-                projectId: "project-1-f9e5b",
-                storageBucket: "project-1-f9e5b.firebasestorage.app",
-                messagingSenderId: "272340259942",
-                appId: "1:272340259942:web:a5a5a302342e0b4eb389a7",
-                measurementId: "G-EKL8BPFSG1"
+            // IMPORTANT: Paste your Firebase config object here
+            const firebaseConfig = { 
+                apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc", 
+                authDomain: "project-1-f9e5b.firebaseapp.com", 
+                projectId: "project-1-f9e5b", 
+                storageBucket: "project-1-f9e5b.appspot.com", 
+                messagingSenderId: "272340259942", 
+                appId: "1:272340259942:web:a5a5a302342e0b4eb389a7", 
+                measurementId: "G-EKL8BPFSG1" 
             };
-            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-            if (!firebaseConfig) {
-                document.body.innerHTML = `<div class="flex items-center justify-center h-screen text-center p-4"><div class="bg-red-900 border border-red-500 text-white p-6 rounded-lg"><h2 class="text-2xl font-bold mb-2">Error: Firebase Configuration Missing</h2><p>Please provide a Firebase configuration object.</p></div></div>`;
+            if (!firebaseConfig.apiKey) {
+                document.body.innerHTML = `<div class="flex items-center justify-center h-screen text-center p-4"><div class="bg-red-900 border border-red-500 text-white p-6 rounded-lg"><h2 class="text-2xl font-bold mb-2">Error: Firebase Configuration Missing</h2><p>Please paste your Firebase config object into the 'initializeFirebase' function in the script.</p></div></div>`;
                 return;
             }
-
             const app = initializeApp(firebaseConfig);
             window.db = getFirestore(app);
             window.auth = getAuth(app);
-
-            // Sign in using the provided custom token or anonymously
-            try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Firebase Auth Error:", error);
-                // Handle authentication failure gracefully, e.g., display an error message
-                return;
-            }
-
+            window.storage = getStorage(app); // Initialize Cloud Storage
+            
             onAuthStateChanged(auth, user => {
                 if (user) {
                     // User is signed in
                     window.userId = user.uid;
-                    // Use the canonical path for data persistence
-                    window.itemsCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/items`);
+                    window.itemsCollectionRef = collection(db, `users/${userId}/items`);
                     updateUserProfile(user);
                     initializeAppState();
                 } else {
@@ -369,7 +306,7 @@
                 }
             });
         }
-        
+
         // --- Authentication ---
         const provider = new GoogleAuthProvider();
 
@@ -383,29 +320,15 @@
             signOut(auth).catch(error => {
                 console.error("Sign out error:", error);
             });
-            // Also revoke Google Drive token
-            if (gapi.client.getToken() !== null) {
-                google.accounts.oauth2.revoke(gapi.client.getToken().access_token, () => {
-                    console.log('Google Drive token revoked.');
-                    isDriveConnected = false;
-                    updateDriveUI();
-                });
-            }
         }
 
         function updateUserProfile(user) {
             if (user) {
                 userProfileDiv.innerHTML = `
-                    <img id="user-pfp-btn" src="${user.photoURL}" alt="User Avatar" class="w-10 h-10 rounded-full cursor-pointer hover:opacity-80">
+                    <img src="${user.photoURL}" alt="User Avatar" class="w-8 h-8 rounded-full">
+                    <button id="sign-out-btn" class="py-2 px-4 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg">Sign Out</button>
                 `;
-                document.getElementById('user-pfp-btn').addEventListener('click', () => {
-                    document.getElementById('settings-pfp').src = user.photoURL;
-                    document.getElementById('settings-username').textContent = user.displayName;
-                    showModal(settingsModal);
-                    updateDriveUI();
-                });
                 document.getElementById('sign-out-btn').addEventListener('click', signOutUser);
-
             } else {
                 userProfileDiv.innerHTML = `
                     <button id="sign-in-btn" class="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg">Sign In with Google</button>
@@ -414,65 +337,6 @@
             }
         }
         
-        // --- Google Drive Integration ---
-        function updateDriveUI() {
-            if (isDriveConnected) {
-                connectDriveBtn.textContent = 'Disconnect';
-                connectDriveBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-                connectDriveBtn.classList.add('bg-red-600', 'hover:bg-red-700');
-            } else {
-                connectDriveBtn.textContent = 'Connect';
-                connectDriveBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-                connectDriveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-            }
-        }
-        
-        function handleAuthClick() {
-            if (gapiLoaded && gisLoaded) {
-                if (isDriveConnected) {
-                    google.accounts.oauth2.revoke(gapi.client.getToken().access_token, () => {
-                        console.log('Google Drive token revoked.');
-                        isDriveConnected = false;
-                        updateDriveUI();
-                    });
-                } else {
-                    tokenClient.requestAccessToken({prompt: 'consent'});
-                }
-            } else {
-                showConfirmation("API Not Loaded", "Google APIs are still loading. Please try again in a moment.", true);
-            }
-        }
-
-        function handleTokenResponse(resp) {
-            if (resp.error !== undefined) {
-                throw (resp);
-            }
-            gapi.client.setToken(resp);
-            isDriveConnected = true;
-            updateDriveUI();
-        }
-
-        async function initGis() {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: (resp) => {
-                    try {
-                        handleTokenResponse(resp);
-                    } catch(err) {
-                        console.error(err);
-                    }
-                },
-            });
-            gisLoaded = true;
-        }
-
-        async function initGapi() {
-            await gapi.client.init({});
-            await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
-            gapiLoaded = true;
-        }
-
         // --- Navigation & View Management (Hash-based) ---
         function navigateTo(folderId) { 
             location.hash = `folder/${folderId}`;
@@ -664,89 +528,48 @@
             } 
             await addDoc(itemsCollectionRef, data); 
         }
-
-        async function uploadFileToDrive(albumId, file) {
-            if (!gapi.client.getToken()) {
-                showConfirmation("Drive Not Connected", "Please connect your Google Drive first in settings.", true);
-                return;
-            }
-
-            const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
-            const metadata = {
-                'name': file.name,
-                'mimeType': file.type,
-                'parents': ['appDataFolder'] // Use a dedicated folder for the app
-            };
-            const form = new FormData();
-            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-            form.append('file', file);
-
-            try {
-                const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                    method: 'POST',
-                    headers: new Headers({ 'Authorization': 'Bearer ' + gapi.client.getToken().access_token }),
-                    body: form
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Upload failed with status: ${response.status}`);
-                }
-
-                const driveFile = await response.json();
-                console.log('File uploaded to Drive:', driveFile);
-
-                // Now get a shareable URL to play the file
-                const fileId = driveFile.id;
-                const permissionsResponse = await gapi.client.drive.permissions.create({
-                    fileId: fileId,
-                    resource: {
-                        role: 'reader',
-                        type: 'anyone'
-                    }
-                });
-
-                console.log('Permissions updated:', permissionsResponse);
-
-                // We don't have a direct "download" URL, so we'll use the file ID in a player-friendly format
-                const fileUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-
-                await addDoc(tracksRef, { fileName: file.name, fileUrl, driveFileId: driveFile.id, createdAt: serverTimestamp() });
-
-            } catch (error) {
-                console.error('Failed to upload file to Google Drive:', error);
-                showConfirmation("Upload Failed", "Could not upload file to Google Drive. Please check your connection and permissions.", true);
-            }
-        }
         
-        async function addTrack(albumId, file) {
-             if (!isDriveConnected) {
-                showConfirmation("Drive Not Connected", "Please connect your Google Drive first in settings.", true);
+        function addTrack(albumId, file) {
+            console.log('Attempting to upload track:', file.name, 'to album:', albumId);
+            if (!window.itemsCollectionRef || !window.userId) {
+                console.error("Upload failed: User or database not initialized.");
                 return;
             }
-            uploadFileToDrive(albumId, file);
+            
+            const trackList = document.getElementById('track-list');
+            const placeholderEl = document.createElement('div');
+            placeholderEl.className = 'flex items-center p-2 rounded-md text-gray-500';
+            placeholderEl.innerHTML = `<div class="w-8 text-right mr-4">...</div><div class="flex-grow">${file.name} <span class="upload-progress">(0%)</span></div>`;
+            trackList.appendChild(placeholderEl);
+            const progressSpan = placeholderEl.querySelector('.upload-progress');
+
+            const storageRef = ref(storage, `users/${userId}/tracks/${Date.now()}_${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on('state_changed', 
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    progressSpan.textContent = `(${Math.round(progress)}%)`;
+                }, 
+                (error) => {
+                    console.error("Firebase Storage upload failed. Code:", error.code, "Message:", error.message);
+                    console.error(error); // Log the full error object
+                    placeholderEl.remove();
+                    showConfirmation("Upload Failed", `Could not upload ${file.name}. Error: ${error.code}. Please check your connection and Firebase Storage rules.`, true);
+                }, 
+                () => {
+                    getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+                        const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
+                        await addDoc(tracksRef, { fileName: file.name, fileUrl: downloadURL, createdAt: serverTimestamp() });
+                        // The placeholder will be removed automatically when the listener updates the track list
+                    });
+                }
+            );
         }
 
-        async function removeTrack(albumId, trackId) { 
-            if (window.itemsCollectionRef) {
-                // Get track info from Firestore
-                const trackDoc = await getDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId));
-                if (trackDoc.exists()) {
-                    const driveFileId = trackDoc.data().driveFileId;
-                    if (driveFileId && gapi.client.getToken()) {
-                         try {
-                             await gapi.client.drive.files.delete({ fileId: driveFileId });
-                             console.log('File deleted from Google Drive:', driveFileId);
-                         } catch (error) {
-                             console.error('Failed to delete file from Google Drive:', error);
-                             showConfirmation("Delete Failed", "Could not delete file from Google Drive. It may have been deleted already or you don't have permissions.", true);
-                         }
-                    }
-                }
-                await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId));
-            } 
-        }
+        async function removeTrack(albumId, trackId) { if (window.itemsCollectionRef) { await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId)); } }
         async function updateItem(id, data) { if(window.itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data); }
-        async function deleteItem(id) { if(window.itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id), data); }
+        async function deleteItem(id) { if(window.itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id)); }
 
         // --- Album Art & Glow Logic ---
         albumArtWrapper.addEventListener('click', () => imageUpload.click());
@@ -758,10 +581,10 @@
 
         // --- UI (Menus & Modals) ---
         function showContextMenu(menu, x, y) { hideAllContextMenus(); if(menu === contextMenuItem) { document.getElementById('edit-btn').disabled = contextTarget.data.type === 'folder'; } const menuWidth = menu.offsetWidth, menuHeight = menu.offsetHeight, screenWidth = window.innerWidth, screenHeight = window.innerHeight; menu.style.left = `${Math.min(x, screenWidth - menuWidth - 10)}px`; menu.style.top = `${Math.min(y, screenHeight - menuHeight - 10)}px`; menu.classList.remove('hidden'); setTimeout(() => menu.classList.remove('opacity-0', 'scale-95'), 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
-        function handleOutsideClick(event) { const isClickInsideMenu = contextMenuBg.contains(event.target) || contextMenuItem.contains(event.target) || contextMenuTrack.contains(event.target) || settingsModal.contains(event.target); if (!isClickInsideMenu) { hideAllContextMenus(); hideModal(settingsModal); } else { document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); } }
+        function handleOutsideClick(event) { const isClickInsideMenu = contextMenuBg.contains(event.target) || contextMenuItem.contains(event.target) || contextMenuTrack.contains(event.target); if (!isClickInsideMenu) { hideAllContextMenus(); } else { document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); } }
         function hideAllContextMenus() { document.removeEventListener('mousedown', handleOutsideClick, { capture: true }); [contextMenuBg, contextMenuItem, contextMenuTrack].forEach(m => { if (!m.classList.contains('hidden')) { m.classList.add('opacity-0', 'scale-95'); setTimeout(() => m.classList.add('hidden'), 200); } }); }
-        function showModal(modal) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
-        function hideModal(modal) { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); document.removeEventListener('mousedown', handleOutsideClick, { capture: true });}
+        function showModal(modal) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); }
+        function hideModal(modal) { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); }
         function showConfirmation(title, message, isAlert = false) { return new Promise((resolve) => { const confirmTitle = document.getElementById('confirm-title'), confirmMessage = document.getElementById('confirm-message'), okBtn = document.getElementById('confirm-ok-btn'), cancelBtn = document.getElementById('confirm-cancel-btn'); confirmTitle.textContent = title; confirmMessage.textContent = message; if(isAlert) { okBtn.textContent = 'OK'; okBtn.className = 'py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors'; cancelBtn.classList.add('hidden'); } else { okBtn.textContent = 'Delete'; okBtn.className = 'py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors'; cancelBtn.classList.remove('hidden'); } showModal(confirmModal); const okHandler = () => { hideModal(confirmModal); resolve(true); cleanup(); }; const cancelHandler = () => { hideModal(confirmModal); resolve(false); cleanup(); }; function cleanup() { okBtn.removeEventListener('click', okHandler); cancelBtn.removeEventListener('click', cancelHandler); } okBtn.addEventListener('click', okHandler, { once: true }); cancelBtn.addEventListener('click', cancelHandler, { once: true }); }); }
 
         // --- State Persistence ---
@@ -786,11 +609,9 @@
         
         // --- Upload Listeners ---
         dropZone.addEventListener('click', () => {
-            if (isDriveConnected) {
-                audioUpload.click();
-            } else {
-                showConfirmation("Connect Google Drive", "You need to connect to Google Drive in the settings to upload files.", true);
-            }
+            // This is where you would initiate a Google Drive Picker if you were to implement it.
+            // For now, it opens the local file picker.
+            audioUpload.click();
         });
         audioUpload.addEventListener('change', (e) => {
             for (const file of e.target.files) {
@@ -803,15 +624,11 @@
             e.preventDefault(); 
             e.stopPropagation();
             dropZone.classList.remove('bg-gray-700', 'border-indigo-500');
-            if (isDriveConnected) {
-                for (const file of e.dataTransfer.files) { 
-                    if (file.type.startsWith('audio/')) { 
-                        addTrack(currentAlbum.id, file); 
-                    } 
+            for (const file of e.dataTransfer.files) { 
+                if (file.type.startsWith('audio/')) { 
+                    addTrack(currentAlbum.id, file); 
                 } 
-            } else {
-                showConfirmation("Connect Google Drive", "You need to connect to Google Drive in the settings to upload files.", true);
-            }
+            } 
         });
         ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, e => { 
             e.preventDefault(); 
@@ -866,7 +683,6 @@
         document.getElementById('delete-btn').addEventListener('click', async e => { e.preventDefault(); hideAllContextMenus(); const confirmed = await showConfirmation('Delete Item?', `You are about to delete "${contextTarget.data.title}". This cannot be undone.`); if (confirmed) { deleteItem(contextTarget.id); } });
         document.getElementById('track-remove-btn').addEventListener('click', e => { e.preventDefault(); if (trackContextTarget) { removeTrack(currentAlbum.id, trackContextTarget.id); } hideAllContextMenus(); });
         suggestArtBtn.addEventListener('click', generateCoverArt);
-        connectDriveBtn.addEventListener('click', handleAuthClick);
         
         document.getElementById('rename-form').addEventListener('submit', e => { 
             e.preventDefault(); 
@@ -889,7 +705,6 @@
         document.getElementById('edit-form').addEventListener('submit', e => { e.preventDefault(); const newData = { title: document.getElementById('edit-title').value, artist: document.getElementById('edit-artist').value, imageUrl: document.getElementById('edit-image-url').value }; if (newData.title && newData.artist && newData.imageUrl) updateItem(contextTarget.id, newData); hideModal(editModal); });
         document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => { hideModal(renameModal); hideModal(editModal); }));
         document.getElementById('confirm-cancel-btn').addEventListener('click', () => hideModal(confirmModal));
-        document.getElementById('settings-close-btn').addEventListener('click', () => hideModal(settingsModal));
 
         // --- Initialize ---
         function initializeAppState() {
@@ -928,10 +743,6 @@
             // Handle initial navigation based on hash
             handleHashChange();
         }
-
-        // --- Google API Callbacks ---
-        window.gapiClientLoaded = initGapi;
-        window.gisLoaded = initGis;
 
         initializeFirebase();
     </script>
