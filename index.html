@@ -350,9 +350,6 @@
                     // Define both the old and new collection paths for potential migration
                     const newCollectionPath = `artifacts/${appId}/users/${userId}/items`;
                     const oldCollectionPath = `users/${userId}/items`;
-
-                    // Check if the old path has data and the new one doesn't.
-                    // If so, migrate the data.
                     migrateData(oldCollectionPath, newCollectionPath, user);
                     
                     window.itemsCollectionRef = collection(db, newCollectionPath);
@@ -496,9 +493,13 @@
                     console.log('Simulated Google Drive connection.');
                 }
             }
+            hideModal(settingsModal);
         }
         
-        // --- Discord Integration ---
+        document.getElementById('connect-drive-btn').addEventListener('click', handleDriveAuthClick);
+
+
+        // --- Discord Integration (Simulated) ---
         let isDiscordConnected = false;
         
         function updateDiscordUI() {
@@ -532,7 +533,10 @@
                     console.log('Simulated Discord connection.');
                 }
             }
+            hideModal(settingsModal);
         }
+        
+        document.getElementById('connect-discord-btn').addEventListener('click', handleDiscordAuthClick);
 
         // --- Navigation & View Management (Hash-based) ---
         function navigateTo(folderId) { 
@@ -945,6 +949,8 @@
         settingsCloseBtn.addEventListener('click', () => hideModal(settingsModal));
 
         // --- Google Drive Integration (Re-enabled) ---
+        // This is a placeholder since the full OAuth flow cannot be done in this environment.
+        // The code simulates a connection/disconnection.
         let isDriveConnected = false;
         
         function updateDriveUI() {
@@ -977,7 +983,7 @@
             }
         }
         
-        connectDriveBtn.addEventListener('click', handleDriveAuthClick);
+        document.getElementById('connect-drive-btn').addEventListener('click', handleDriveAuthClick);
 
 
         // --- Discord Integration (Simulated) ---
@@ -1016,7 +1022,7 @@
             }
         }
         
-        connectDiscordBtn.addEventListener('click', handleDiscordAuthClick);
+        document.getElementById('connect-discord-btn').addEventListener('click', handleDiscordAuthClick);
 
         // --- Initialize ---
         function initializeAppState() {
