@@ -7,6 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <style>
+        /* Add a border around the entire page */
+        body {
+            border: 8px solid #1A1A1A;
+        }
         /* Style for the video player's timeline */
         video::-webkit-media-controls-timeline {
             background-color: rgba(255, 255, 255, 0.2);
@@ -20,9 +24,12 @@
 </head>
 <body class="bg-[#3D3D3D] text-white font-sans flex h-screen overflow-hidden">
 
+    <!-- Title -->
+    <h1 class="absolute top-4 left-4 text-2xl font-bold z-10">Project_1</h1>
+
     <!-- Main Content: Video Player and Drop Zone -->
     <main id="drop-zone" class="flex-grow flex flex-col items-center justify-center h-full p-4 transition-all duration-300 bg-[#3D3D3D]">
-        <div id="video-container" class="w-full max-w-6xl h-full bg-[#3D3D3D] rounded-lg shadow-2xl flex items-center justify-center relative group">
+        <div id="video-container" class="w-full max-w-6xl h-full flex items-center justify-center relative group">
             <!-- Initial state: Blank background -->
             <div id="drop-message" class="text-center p-8">
                 <!-- Content removed to make the background blank -->
