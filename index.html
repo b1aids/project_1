@@ -79,7 +79,25 @@
             transform: scale(1.05);
         }
         .player-bar button:hover {
-           transform: scale(1.1);
+             transform: scale(1.1);
+        }
+
+        /* --- Waveform Canvas --- */
+        #waveform-canvas {
+            width: 100%;
+            height: 50px; /* Height of the waveform */
+            cursor: pointer;
+        }
+        
+        /* --- Player Icon Styling --- */
+        .player-icon {
+            width: 20px;
+            height: 20px;
+            filter: invert(1); /* Makes the black icons white */
+        }
+        .play-pause-icon {
+            width: 24px;
+            height: 24px;
         }
     </style>
 </head>
@@ -96,12 +114,13 @@
                     </button>
                     <div class="flex items-center gap-3">
                         <!-- Image Logo -->
-                        <img src="https://placehold.co/32x32/5865F2/FFFFFF?text=P1" alt="Logo" class="h-6 w-6 rounded">
+                        <img src="./img/logo.png" alt="Logo" class="h-6 w-6">
                         <h1 id="header-title" class="text-xl font-bold text-white">project_1</h1>
                     </div>
                 </div>
-                <div id="user-profile" class="flex items-center space-x-4">
-                    <!-- This will be populated by JS -->
+                <div class="flex items-center space-x-4">
+                    <button class="p-2 rounded-full hover:bg-gray-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></button>
+                    <button class="p-2 rounded-full hover:bg-gray-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></button>
                 </div>
             </header>
 
@@ -123,11 +142,10 @@
                         <p id="album-view-artist" class="text-lg text-gray-400"></p>
                         <p id="album-view-meta" class="text-sm text-gray-500 mt-1"></p>
                     </div>
-                    <div class="w-full md:w-2/3 lg:w-3/4">
+                    <div id="drop-zone" class="w-full md:w-2/3 lg:w-3/4">
                         <div id="track-list" class="space-y-1"></div>
-                        <div id="drop-zone" class="mt-4 text-center p-8 border-2 border-dashed border-gray-700 rounded-lg transition-all cursor-pointer hover:bg-gray-800 hover:border-indigo-500">
-                            <p class="text-gray-500">Drag & Drop Audio Files Here or Click to Upload</p>
-                            <input type="file" id="audio-upload" accept="audio/*" class="hidden" multiple>
+                        <div id="drop-message" class="mt-4 text-center p-8 border-2 border-dashed border-gray-700 rounded-lg transition-all">
+                            <p class="text-gray-500">Drag & Drop Audio Files Here to Add Tracks</p>
                         </div>
                     </div>
                 </div>
@@ -135,48 +153,26 @@
         </div>
 
         <!-- Player Bar -->
-        <footer id="player-bar" class="player-bar flex-shrink-0 bg-[#181818] p-2 flex items-center gap-4 text-white">
-            <!-- Album Info (Smaller Art) -->
+        <footer id="player-bar" class="player-bar flex-shrink-0 bg-[#181818] p-3 flex items-center gap-4 text-white">
             <div class="w-1/4 flex items-center gap-3">
-                <img id="player-album-art" src="https://placehold.co/64x64/202225/333?text=-" class="w-14 h-14 rounded">
+                <img id="player-album-art" src="https://placehold.co/64x64/202225/333?text=-" class="w-16 h-16 rounded">
                 <div>
                     <h3 id="player-track-title" class="font-bold text-sm truncate">No song selected</h3>
                     <p id="player-track-artist" class="text-xs text-gray-400 truncate">...</p>
                 </div>
             </div>
-
-            <!-- Player Controls & New Progress Bar -->
             <div class="w-1/2 flex flex-col items-center justify-center gap-2">
+                 <!-- Waveform Canvas replaces the progress bar -->
+                <canvas id="waveform-canvas"></canvas>
                 <div class="flex items-center gap-4">
-                    <button id="shuffle-btn" class="p-2 text-gray-400 hover:text-white">
-                        <!-- Shuffle SVG Icon -->
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="16 16 21 16 21 21"></polyline><line x1="4" y1="4" x2="11" y2="11"></line></svg>
-                    </button>
-                    <button id="prev-btn" class="p-2 text-gray-400 hover:text-white">
-                        <!-- Previous SVG Icon -->
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"></path></svg>
-                    </button>
-                    <button id="play-pause-btn" class="p-3 bg-white text-black rounded-full flex items-center justify-center">
-                         <!-- Play SVG Icon -->
-                        <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
-                         <!-- Pause SVG Icon (hidden by default) -->
-                        <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>
-                    </button>
-                    <button id="next-btn" class="p-2 text-gray-400 hover:text-white">
-                        <!-- Next SVG Icon -->
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="m6 18 8.5-6L6 6v12zM16 6v12h2V6h-2z"></path></svg>
-                    </button>
-                    <button id="loop-btn" class="p-2 text-gray-400 hover:text-white">
-                         <!-- Loop SVG Icon -->
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-                    </button>
+                    <button id="shuffle-btn" class="p-2"><img src="./img/controls/loop.png" class="player-icon"></button>
+                    <button id="prev-btn" class="p-2"><img src="./img/controls/back.png" class="player-icon"></button>
+                    <button id="play-pause-btn" class="p-3 bg-white text-black rounded-full"><img id="play-pause-icon" src="./img/controls/play.png" class="play-pause-icon"></button>
+                    <button id="next-btn" class="p-2"><img src="./img/controls/skip.png" class="player-icon"></button>
                 </div>
-                <div class="w-full flex items-center gap-2 text-xs">
+                <div class="w-full flex items-center gap-2 text-xs -mt-2">
                     <span id="current-time">0:00</span>
-                    <!-- NEW Clickable Progress Bar -->
-                    <div id="progress-bar-container" class="w-full h-1 bg-gray-600 rounded-full cursor-pointer group">
-                        <div id="progress-bar" class="h-1 bg-white rounded-full group-hover:bg-green-500"></div>
-                    </div>
+                    <div class="w-full"></div> <!-- Spacer for canvas -->
                     <span id="total-time">0:00</span>
                 </div>
             </div>
@@ -190,7 +186,7 @@
     </div>
     <div id="context-menu-bg" class="fixed bg-gray-900 text-white w-56 rounded-lg shadow-xl p-2 z-50 hidden opacity-0 transform scale-95 transition-all">
         <a href="#" id="add-album-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-12c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 6l12-3" /></svg>Add Album</a>
-        <a href="#" id="add-folder-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-l2-2H5a2 2 0 00-2 2z" /></svg>Add Folder</a>
+        <a href="#" id="add-folder-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>Add Folder</a>
     </div>
     <div id="context-menu-item" class="fixed bg-gray-900 text-white w-56 rounded-lg shadow-xl p-2 z-50 hidden opacity-0 transform scale-95 transition-all">
         <a href="#" id="rename-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>Rename</a>
@@ -220,119 +216,52 @@
             </div>
         </div>
     </div>
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 opacity-0 transition-opacity">
-        <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md transform scale-95 transition-transform">
-            <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-bold text-white">Settings</h2>
-                <button id="settings-close-btn" class="p-2 rounded-full hover:bg-gray-700">&times;</button>
-            </div>
-            
-            <div class="flex items-center space-x-4 mb-6">
-                <img id="settings-pfp" src="" class="w-16 h-16 rounded-full">
-                <div>
-                    <h3 id="settings-username" class="text-xl font-bold text-white"></h3>
-                    <p class="text-gray-400">User Profile</p>
-                </div>
-            </div>
-
-            <div class="space-y-4">
-                <h4 class="text-lg font-semibold text-white border-b border-gray-700 pb-2">Connections</h4>
-                <div id="drive-connect-status" class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                    <span class="font-semibold">Google Drive</span>
-                    <button id="connect-drive-btn" class="py-1 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg">Connect</button>
-                </div>
-                <div id="discord-connect-status" class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                    <span class="font-semibold">Discord</span>
-                    <button id="connect-discord-btn" class="py-1 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg">Connect</button>
-                </div>
-            </div>
-
-            <div class="mt-8 flex justify-end">
-                <button id="sign-out-btn" class="py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg">Sign Out</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Google API Client Libraries -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- State Management ---
         let currentView = 'grid', currentFolderId = 'root', currentAlbum = null;
+        let navigationStack = [{id: 'root', title: 'project_1'}];
         let contextTarget = null, trackContextTarget = null;
         let itemCount = 0;
         let tracksUnsubscribe = null, itemsUnsubscribe = null;
-        let currentItemDocs = []; // To store current items for duplicate checks
-        let isDriveConnected = false;
-        let isDiscordConnected = false; // New state for Discord connection
         
         // --- Player State ---
         const audio = new Audio();
+        audio.crossOrigin = "anonymous"; // Required for audio analysis
         let currentPlaylist = [];
         let currentTrackIndex = -1;
         let isPlaying = false;
         let isShuffle = false;
-        let isLoop = false;
-
-        // --- Google API State ---
-        let gapiLoaded = false;
-        let gisLoaded = false;
-        let tokenClient;
-        const CLIENT_ID = 'YOUR_GOOGLE_DRIVE_API_CLIENT_ID'; // Replace with your client ID
-        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
         
-        // --- Discord API State ---
-        const DISCORD_CLIENT_ID = 'YOUR_DISCORD_CLIENT_ID'; // Replace with your Discord Client ID
-        const DISCORD_SCOPES = ['identify', 'guilds'];
-        const DISCORD_REDIRECT_URI = 'https://example.com/auth/discord/callback'; // Replace with your redirect URI
+        // --- Web Audio API for Visualization ---
+        let audioContext, analyser, sourceNode, dataArray;
+        let isAudioContextInitialized = false;
 
         // --- DOM Elements ---
         const gridView = document.getElementById('grid-view'), albumView = document.getElementById('album-view');
         const itemGrid = document.getElementById('item-grid');
         const headerTitle = document.getElementById('header-title'), backButton = document.getElementById('back-button');
         const contextMenuBg = document.getElementById('context-menu-bg'), contextMenuItem = document.getElementById('context-menu-item'), contextMenuTrack = document.getElementById('context-menu-track');
-        const renameModal = document.getElementById('rename-modal'), editModal = document.getElementById('edit-modal'), confirmModal = document.getElementById('confirm-modal'), settingsModal = document.getElementById('settings-modal');
+        const renameModal = document.getElementById('rename-modal'), editModal = document.getElementById('edit-modal'), confirmModal = document.getElementById('confirm-modal');
         const dropZone = document.getElementById('drop-zone');
-        const audioUpload = document.getElementById('audio-upload');
         const suggestArtBtn = document.getElementById('suggest-art-btn');
         const imageUpload = document.getElementById('image-upload');
         const albumArtWrapper = document.getElementById('album-art-wrapper');
         const playerBar = document.getElementById('player-bar');
-        const playPauseBtn = document.getElementById('play-pause-btn');
-        const playIcon = document.getElementById('play-icon');
-        const pauseIcon = document.getElementById('pause-icon');
+        const playPauseBtn = document.getElementById('play-pause-btn'), playPauseIcon = document.getElementById('play-pause-icon');
+        const waveformCanvas = document.getElementById('waveform-canvas');
         const nextBtn = document.getElementById('next-btn');
         const prevBtn = document.getElementById('prev-btn');
         const shuffleBtn = document.getElementById('shuffle-btn');
-        const loopBtn = document.getElementById('loop-btn');
-        const progressBarContainer = document.getElementById('progress-bar-container');
-        const progressBar = document.getElementById('progress-bar');
-        const currentTimeEl = document.getElementById('current-time');
-        const totalTimeEl = document.getElementById('total-time');
-        const userProfileDiv = document.getElementById('user-profile');
-        const connectDriveBtn = document.getElementById('connect-drive-btn');
-        const discordConnectStatus = document.getElementById('discord-connect-status');
-        const connectDiscordBtn = document.getElementById('connect-discord-btn');
-
+        
         // --- Firebase Setup ---
         async function initializeFirebase() {
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const firebaseConfig = {
-                apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc",
-                authDomain: "project-1-f9e5b.firebaseapp.com",
-                projectId: "project-1-f9e5b",
-                storageBucket: "project-1-f9e5b.firebasestorage.app",
-                messagingSenderId: "272340259942",
-                appId: "1:272340259942:web:a5a5a302342e0b4eb389a7",
-                measurementId: "G-EKL8BPFSG1"
-            };
+            const firebaseConfig = { apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc", authDomain: "project-1-f9e5b.firebaseapp.com", projectId: "project-1-f9e5b", storageBucket: "project-1-f9e5b.appspot.com", messagingSenderId: "272340259942", appId: "1:272340259942:web:a5a5a302342e0b4eb389a7", measurementId: "G-EKL8BPFSG1" };
             if (!firebaseConfig.apiKey) {
                 document.body.innerHTML = `<div class="flex items-center justify-center h-screen text-center p-4"><div class="bg-red-900 border border-red-500 text-white p-6 rounded-lg"><h2 class="text-2xl font-bold mb-2">Error: Firebase Configuration Missing</h2><p>Please paste your Firebase config object into the 'initializeFirebase' function in the script.</p></div></div>`;
                 return;
@@ -340,255 +269,44 @@
             const app = initializeApp(firebaseConfig);
             window.db = getFirestore(app);
             window.auth = getAuth(app);
-            window.storage = getStorage(app);
-
-            // onAuthStateChanged is the central place to handle user state.
+            window.storage = getStorage(app); // Initialize Cloud Storage
             onAuthStateChanged(auth, user => {
                 if (user) {
-                    // User is signed in.
                     window.userId = user.uid;
-                    // Define both the old and new collection paths for potential migration
-                    const newCollectionPath = `artifacts/${appId}/users/${userId}/items`;
-                    const oldCollectionPath = `users/${userId}/items`;
-                    migrateData(oldCollectionPath, newCollectionPath, user);
-                    
-                    window.itemsCollectionRef = collection(db, newCollectionPath);
-                    updateUserProfile(user);
-                    initializeAppState();
+                    window.itemsCollectionRef = collection(db, `users/${userId}/items`);
+                    listenForItems();
                 } else {
-                    // User is signed out. Display sign-in UI.
                     if (itemsUnsubscribe) itemsUnsubscribe();
-                    if (tracksUnsubscribe) tracksUnsubscribe();
-                    
-                    document.body.innerHTML = `
-                        <div class="flex flex-col h-screen items-center justify-center p-4">
-                            <div class="flex items-center gap-3 mb-6">
-                                <img src="https://placehold.co/32x32/5865F2/FFFFFF?text=P1" alt="Logo" class="h-8 w-8 rounded">
-                                <h1 class="text-2xl font-bold text-white">project_1</h1>
-                            </div>
-                            <div class="text-center p-8 bg-[#202225] rounded-lg shadow-xl border border-gray-700">
-                                <p class="text-lg text-gray-300 mb-6">Sign in to access your library.</p>
-                                <button id="sign-in-btn" class="py-2 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors">Sign In with Google</button>
-                            </div>
-                        </div>
-                    `;
-                    document.getElementById('sign-in-btn').addEventListener('click', signIn);
+                    itemGrid.innerHTML = '';
                 }
             });
-        }
-
-        // --- Data Migration Logic ---
-        async function migrateData(oldPath, newPath, user) {
-            const oldCollectionRef = collection(db, oldPath);
-            const newCollectionRef = collection(db, newPath);
-
             try {
-                // Check if the new collection is empty
-                const newDocs = await getDocs(newCollectionRef);
-                if (!newDocs.empty) {
-                    console.log("New collection path already has data, no migration needed.");
-                    return;
-                }
-
-                // Check if the old collection has data
-                const oldDocs = await getDocs(oldCollectionRef);
-                if (oldDocs.empty) {
-                    console.log("Old collection path is empty, no migration needed.");
-                    return;
-                }
-
-                console.log("Migrating data from old path to new path...");
-                for (const oldDoc of oldDocs.docs) {
-                    const docData = oldDoc.data();
-                    // Add the document to the new path
-                    await setDoc(doc(newCollectionRef, oldDoc.id), docData);
-
-                    // Check for nested 'tracks' subcollection and migrate it as well
-                    const oldTracksRef = collection(db, `${oldPath}/${oldDoc.id}/tracks`);
-                    const newTracksRef = collection(db, `${newPath}/${oldDoc.id}/tracks`);
-                    const oldTracks = await getDocs(oldTracksRef);
-                    if (!oldTracks.empty) {
-                        for (const oldTrack of oldTracks.docs) {
-                            await setDoc(doc(newTracksRef, oldTrack.id), oldTrack.data());
-                            // Optional: delete old tracks
-                            await deleteDoc(doc(oldTracksRef, oldTrack.id));
-                        }
-                    }
-                    // Optional: delete the old top-level document
-                    await deleteDoc(doc(oldCollectionRef, oldDoc.id));
-                }
-                console.log("Data migration complete.");
-
+                await signInAnonymously(auth);
             } catch (error) {
-                console.error("Error during data migration:", error);
-            }
-        }
-
-        // --- Authentication ---
-        const provider = new GoogleAuthProvider();
-
-        function signIn() {
-            signInWithPopup(auth, provider).then(() => {
-                // Reload the page on successful sign-in to re-initialize everything
-                window.location.reload();
-            }).catch(error => {
-                console.error("Sign in error:", error);
-            });
-        }
-
-        function signOutUser() {
-            signOut(auth).catch(error => {
-                console.error("Sign out error:", error);
-            });
-        }
-
-        function updateUserProfile(user) {
-            if (user) {
-                userProfileDiv.innerHTML = `
-                    <img id="user-pfp-btn" src="${user.photoURL}" alt="User Avatar" class="w-10 h-10 rounded-full cursor-pointer hover:opacity-80">
-                `;
-                document.getElementById('user-pfp-btn').addEventListener('click', () => {
-                    document.getElementById('settings-pfp').src = user.photoURL;
-                    document.getElementById('settings-username').textContent = user.displayName;
-                    showModal(settingsModal);
-                });
-                document.getElementById('sign-out-btn').addEventListener('click', signOutUser);
-
-            } else {
-                userProfileDiv.innerHTML = ``; // Clear user profile when signed out
+                console.error("Anonymous authentication failed:", error);
+                document.body.innerHTML = '<div class="flex items-center justify-center h-screen text-red-500">Error: Authentication failed. Please check your Firebase security rules.</div>';
             }
         }
         
-        // --- Google Drive Integration ---
-        // This is a placeholder since the full OAuth flow cannot be done in this environment.
-        // The code simulates a connection/disconnection.
-        let isDriveConnected = false;
-        
-        function updateDriveUI() {
-            const connectDriveBtn = document.getElementById('connect-drive-btn');
-            if (isDriveConnected) {
-                connectDriveBtn.textContent = 'Disconnect';
-                connectDriveBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-                connectDriveBtn.classList.add('bg-red-600', 'hover:bg-red-700');
-            } else {
-                connectDriveBtn.textContent = 'Connect';
-                connectDriveBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-                connectDriveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-            }
-        }
-        
-        async function handleDriveAuthClick() {
-            if (isDriveConnected) {
-                const confirmed = await showConfirmation('Disconnect Google Drive?', 'Are you sure you want to disconnect from Google Drive?', false);
-                if (confirmed) {
-                    isDriveConnected = false;
-                    updateDriveUI();
-                    console.log('Simulated Google Drive token revocation.');
-                }
-            } else {
-                const confirmed = await showConfirmation('Connect Google Drive?', 'This will open a new window to authorize with Google Drive.', true);
-                if (confirmed) {
-                    isDriveConnected = true;
-                    updateDriveUI();
-                    console.log('Simulated Google Drive connection.');
-                }
-            }
-            hideModal(settingsModal);
-        }
-        
-        document.getElementById('connect-drive-btn').addEventListener('click', handleDriveAuthClick);
-
-
-        // --- Discord Integration (Simulated) ---
-        let isDiscordConnected = false;
-        
-        function updateDiscordUI() {
-            const connectDiscordBtn = document.getElementById('connect-discord-btn');
-            if (isDiscordConnected) {
-                connectDiscordBtn.textContent = 'Disconnect';
-                connectDiscordBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-                connectDiscordBtn.classList.add('bg-red-600', 'hover:bg-red-700');
-            } else {
-                connectDiscordBtn.textContent = 'Connect';
-                connectDiscordBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-                connectDiscordBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-            }
-        }
-
-        async function handleDiscordAuthClick() {
-            if (isDiscordConnected) {
-                // Simulate token revocation
-                const confirmed = await showConfirmation('Disconnect Discord?', 'Are you sure you want to disconnect from Discord?', false);
-                if (confirmed) {
-                    isDiscordConnected = false;
-                    updateDiscordUI();
-                    console.log('Simulated Discord token revocation.');
-                }
-            } else {
-                // Simulate OAuth flow
-                const confirmed = await showConfirmation('Connect Discord?', 'This will open a new window to authorize with Discord.', true);
-                if (confirmed) {
-                    isDiscordConnected = true;
-                    updateDiscordUI();
-                    console.log('Simulated Discord connection.');
-                }
-            }
-            hideModal(settingsModal);
-        }
-        
-        document.getElementById('connect-discord-btn').addEventListener('click', handleDiscordAuthClick);
-
-        // --- Navigation & View Management (Hash-based) ---
-        function navigateTo(folderId) { 
-            location.hash = `folder/${folderId}`;
-        }
-
-        function navigateBack() { 
-            history.back();
-        }
-
-        function showAlbumView(album) { 
-            location.hash = `album/${album.id}`;
-        }
-
-        async function handleHashChange() {
-            if (!auth.currentUser) return; // Don't navigate if not signed in
-            const hash = location.hash.substring(1);
-            const [type, id] = hash.split('/');
-
-            if (type === 'folder' && id) {
-                currentFolderId = id;
-                updateView('grid');
-            } else if (type === 'album' && id) {
-                const albumDocRef = doc(db, itemsCollectionRef.path, id);
-                const albumDoc = await getDoc(albumDocRef);
-                if (albumDoc.exists()) {
-                    currentAlbum = { id: albumDoc.id, data: albumDoc.data() };
-                    currentFolderId = currentAlbum.data.parentId;
-                    updateView('album');
-                } else {
-                    console.error("Album not found, redirecting to root.");
-                    location.hash = 'folder/root';
-                }
-            } else {
-                location.hash = 'folder/root';
-            }
-        }
-
+        // --- Navigation & View Management ---
+        function navigateTo(folderId, folderTitle) { history.pushState({ view: 'grid', folderId, folderTitle }, folderTitle, `./folder/${folderId}`); navigationStack.push({id: folderId, title: folderTitle}); currentFolderId = folderId; updateView('grid'); }
+        function navigateBack() { if (currentView === 'album' || navigationStack.length > 1) { history.back(); } }
+        function showAlbumView(album) { currentAlbum = album; const albumUrl = `./album/${encodeURIComponent(album.data.title.replace(/\s+/g, '-'))}`; history.pushState({ view: 'album', albumId: album.id, folderId: currentFolderId }, album.data.title, albumUrl); updateView('album'); }
         function updateView(view) {
             currentView = view;
             if (itemsUnsubscribe) { itemsUnsubscribe(); itemsUnsubscribe = null; }
             if (tracksUnsubscribe) { tracksUnsubscribe(); tracksUnsubscribe = null; }
-            
-            backButton.style.display = (currentFolderId !== 'root' || view === 'album') ? 'flex' : 'none';
-
             if (view === 'grid') {
-                headerTitle.textContent = currentFolderId === 'root' ? 'project_1' : '...';
+                const currentFolder = navigationStack[navigationStack.length - 1];
+                currentFolderId = currentFolder.id;
+                headerTitle.textContent = currentFolder.title;
+                backButton.style.display = navigationStack.length > 1 ? 'flex' : 'none';
                 gridView.classList.remove('hidden');
                 albumView.classList.add('hidden');
                 listenForItems();
             } else if (view === 'album') {
                 headerTitle.textContent = currentAlbum.data.title;
+                backButton.style.display = 'flex';
                 gridView.classList.add('hidden');
                 albumView.classList.remove('hidden');
                 const coverImg = document.getElementById('album-view-cover');
@@ -602,22 +320,15 @@
 
         // --- Data Rendering ---
         function renderItems(docs) {
-            currentItemDocs = docs.map(doc => ({ id: doc.id, data: doc.data() }));
             itemGrid.innerHTML = '';
             itemCount = docs.length;
             if (docs.length === 0) { itemGrid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10">Right-click to add your first album or folder.</div>`; }
-            
-            if (currentFolderId !== 'root') {
-                 getDoc(doc(db, itemsCollectionRef.path, currentFolderId)).then(docSnap => {
-                     if(docSnap.exists()) headerTitle.textContent = docSnap.data().title;
-                 });
-            }
-
-            currentItemDocs.forEach(item => {
+            docs.forEach(doc => {
+                const item = { id: doc.id, data: doc.data() };
                 const el = document.createElement('div');
                 el.className = 'w-full space-y-2 cursor-pointer group item-fade-in';
                 el.innerHTML = item.data.type === 'album' ? `<div class="relative aspect-square"><img src="${item.data.imageUrl}" class="w-full h-full object-cover rounded-lg shadow-lg group-hover:scale-105 transition-transform" onerror="this.src='https://placehold.co/200x200/333/fff?text=Error';"></div><div class="text-white"><h3 class="font-bold truncate">${item.data.title}</h3><p class="text-sm text-gray-400 truncate">${item.data.artist}</p></div>` : `<div class="relative aspect-square w-full h-full rounded-lg shadow-lg bg-gray-800 flex items-center justify-center group-hover:scale-105 transition-transform"><svg class="h-1/2 w-1/2 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg></div><div class="text-white"><h3 class="font-bold truncate">${item.data.title}</h3><p class="text-sm text-gray-400">Folder</p></div>`;
-                el.addEventListener('click', () => item.data.type === 'folder' ? navigateTo(item.id) : showAlbumView(item));
+                el.addEventListener('click', () => item.data.type === 'folder' ? navigateTo(item.id, item.data.title) : showAlbumView(item));
                 el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); contextTarget = item; showContextMenu(contextMenuItem, e.clientX, e.clientY); });
                 itemGrid.appendChild(el);
             });
@@ -639,9 +350,24 @@
             });
         }
         
-        // --- Audio Player Logic ---
+        // --- Audio Player & Visualization Logic ---
+        function initializeAudioContext() {
+            if (isAudioContextInitialized) return;
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            sourceNode = audioContext.createMediaElementSource(audio);
+            sourceNode.connect(analyser);
+            analyser.connect(audioContext.destination);
+            analyser.fftSize = 256;
+            const bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+            isAudioContextInitialized = true;
+            visualize();
+        }
+
         function playTrack(index) {
             if (index < 0 || index >= currentPlaylist.length) return;
+            if (!isAudioContextInitialized) initializeAudioContext();
             currentTrackIndex = index;
             const track = currentPlaylist[index];
             audio.src = track.fileUrl;
@@ -652,152 +378,64 @@
             playerBar.classList.add('visible');
         }
 
-        function togglePlayPause() { 
-            if (currentTrackIndex === -1) return; 
-            if (isPlaying) { 
-                audio.pause(); 
-            } else { 
-                audio.play(); 
-            } 
-            isPlaying = !isPlaying; 
-            updatePlayPauseIcon(); 
+        function visualize() {
+            const canvasCtx = waveformCanvas.getContext('2d');
+            const WIDTH = waveformCanvas.width;
+            const HEIGHT = waveformCanvas.height;
+
+            analyser.getByteFrequencyData(dataArray);
+            
+            canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
+
+            const barWidth = (WIDTH / dataArray.length) * 1.5;
+            let x = 0;
+
+            const gradient = canvasCtx.createLinearGradient(0, 0, 0, HEIGHT);
+            gradient.addColorStop(0, 'red');
+            gradient.addColorStop(0.5, 'orange');
+            gradient.addColorStop(1, 'yellow');
+            canvasCtx.fillStyle = gradient;
+
+            for (let i = 0; i < dataArray.length; i++) {
+                const barHeight = dataArray[i] / 2;
+                canvasCtx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight);
+                x += barWidth + 1;
+            }
+            
+            if (audio.duration) {
+                const progress = audio.currentTime / audio.duration;
+                canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                canvasCtx.fillRect(0, 0, WIDTH * progress, HEIGHT);
+            }
+
+            requestAnimationFrame(visualize);
         }
 
+        function togglePlayPause() { if (currentTrackIndex === -1) return; if (isPlaying) { audio.pause(); } else { audio.play(); if(!isAudioContextInitialized) initializeAudioContext(); } isPlaying = !isPlaying; updatePlayPauseIcon(); }
         function stopPlayback() { audio.pause(); audio.currentTime = 0; isPlaying = false; updatePlayPauseIcon(); playerBar.classList.remove('visible'); }
-        
-        function playNext() { 
-            if (currentPlaylist.length === 0) return; 
-            if (isLoop) {
-                playTrack(currentTrackIndex);
-                return;
-            }
-            let nextIndex = isShuffle ? Math.floor(Math.random() * currentPlaylist.length) : currentTrackIndex + 1; 
-            if (nextIndex >= currentPlaylist.length) nextIndex = 0; 
-            playTrack(nextIndex); 
-        }
-
-        function playPrev() { 
-            if (currentPlaylist.length === 0) return; 
-            let prevIndex = currentTrackIndex - 1; 
-            if (prevIndex < 0) prevIndex = currentPlaylist.length - 1; 
-            playTrack(prevIndex); 
-        }
-
-        function updatePlayerUI(track) { 
-            document.getElementById('player-album-art').src = track.albumArt; 
-            document.getElementById('player-track-title').textContent = track.fileName; 
-            document.getElementById('player-track-artist').textContent = track.artist; 
-        }
-
-        function updatePlayPauseIcon() { 
-            if (isPlaying) {
-                playIcon.classList.add('hidden');
-                pauseIcon.classList.remove('hidden');
-            } else {
-                playIcon.classList.remove('hidden');
-                pauseIcon.classList.add('hidden');
-            }
-        }
-
-        function formatTime(seconds) { 
-            const minutes = Math.floor(seconds / 60); 
-            const secs = Math.floor(seconds % 60); 
-            return `${minutes}:${secs < 10 ? '0' : ''}${secs}`; 
-        }
+        function playNext() { if (currentPlaylist.length === 0) return; let nextIndex = isShuffle ? Math.floor(Math.random() * currentPlaylist.length) : currentTrackIndex + 1; if (nextIndex >= currentPlaylist.length) nextIndex = 0; playTrack(nextIndex); }
+        function playPrev() { if (currentPlaylist.length === 0) return; let prevIndex = currentTrackIndex - 1; if (prevIndex < 0) prevIndex = currentPlaylist.length - 1; playTrack(prevIndex); }
+        function updatePlayerUI(track) { document.getElementById('player-album-art').src = track.albumArt; document.getElementById('player-track-title').textContent = track.fileName; document.getElementById('player-track-artist').textContent = track.artist; }
+        function updatePlayPauseIcon() { playPauseIcon.src = isPlaying ? './img/controls/pause.png' : './img/controls/play.png'; }
+        function formatTime(seconds) { const minutes = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60); return `${minutes}:${secs < 10 ? '0' : ''}${secs}`; }
 
         // --- Firestore & Storage Logic ---
         function listenForItems() { if (window.itemsCollectionRef) { if (itemsUnsubscribe) itemsUnsubscribe(); const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId)); itemsUnsubscribe = onSnapshot(q, s => renderItems(s.docs.sort((a, b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for items:", e)); } }
         function listenForTracks(albumId) { if (window.itemsCollectionRef) { const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); if (tracksUnsubscribe) tracksUnsubscribe(); tracksUnsubscribe = onSnapshot(query(tracksRef), s => renderTracks(s.docs.sort((a,b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for tracks:", e)); } }
-        
-        async function createItem(type) { 
-            if (!window.itemsCollectionRef || !auth.currentUser) return;
-            
-            let name = `New ${type}`;
-            let counter = 1;
-            let finalName = `${name} ${counter}`;
-            const existingTitles = currentItemDocs.map(item => item.data.title.toLowerCase());
-
-            while (existingTitles.includes(finalName.toLowerCase())) {
-                counter++;
-                finalName = `${name} ${counter}`;
-            }
-
-            const data = { title: finalName, type, parentId: currentFolderId, createdAt: serverTimestamp() }; 
-            if (type === 'album') { 
-                data.artist = 'Untitled Artist'; 
-                data.imageUrl = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(finalName)}`; 
-            } 
-            await addDoc(itemsCollectionRef, data); 
-        }
-        
+        async function createItem(type) { if (window.itemsCollectionRef) { const name = `New ${type} ${itemCount + 1}`; const data = { title: name, type, parentId: currentFolderId, createdAt: serverTimestamp() }; if (type === 'album') { data.artist = 'Untitled Artist'; data.imageUrl = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(name)}`; } await addDoc(itemsCollectionRef, data); } }
         async function addTrack(albumId, file) {
-            if (!window.itemsCollectionRef || !window.userId) {
-                console.error("Upload failed: User or database not initialized.");
-                return;
-            }
-            
-            const trackList = document.getElementById('track-list');
-            const placeholderEl = document.createElement('div');
-            placeholderEl.className = 'flex items-center p-2 rounded-md text-gray-500';
-            placeholderEl.innerHTML = `<div class="w-8 text-right mr-4">...</div><div class="flex-grow">${file.name} <span class="upload-progress">(0%)</span></div>`;
-            trackList.appendChild(placeholderEl);
-            const progressSpan = placeholderEl.querySelector('.upload-progress');
-
-            const storageRef = ref(storage, `users/${userId}/tracks/${Date.now()}_${file.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, file);
-
-            uploadTask.on('state_changed', 
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    progressSpan.textContent = `(${Math.round(progress)}%)`;
-                }, 
-                (error) => {
-                    console.error("Firebase Storage upload failed. Code:", error.code, "Message:", error.message);
-                    console.error(error); // Log the full error object
-                    placeholderEl.remove();
-                    showConfirmation("Upload Failed", `Could not upload ${file.name}. Error: ${error.code}. Please check your connection and Firebase Storage rules.`, true);
-                }, 
-                () => {
-                    getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
-                        const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
-                        await addDoc(tracksRef, { fileName: file.name, fileUrl: downloadURL, createdAt: serverTimestamp() });
-                        // The placeholder will be removed automatically when the listener updates the track list
-                    });
-                }
-            );
-        }
-
-        async function removeTrack(albumId, trackId) { 
             if (!window.itemsCollectionRef || !window.userId) return;
-            
-            const trackDocRef = doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId);
-            const trackDoc = await getDoc(trackDocRef);
-
-            if (trackDoc.exists()) {
-                const trackData = trackDoc.data();
-                const fileUrl = trackData.fileUrl;
-                const fileRef = ref(storage, fileUrl);
-
-                // Delete the file from Firebase Storage
-                try {
-                    await deleteObject(fileRef);
-                    console.log('File deleted from Firebase Storage:', fileUrl);
-                } catch (error) {
-                    console.error('Failed to delete file from Firebase Storage:', error);
-                }
-
-                // Delete the document from Firestore
-                try {
-                    await deleteDoc(trackDocRef);
-                    console.log('Track document deleted from Firestore:', trackId);
-                } catch (error) {
-                    console.error('Failed to delete track document from Firestore:', error);
-                }
-            } else {
-                console.error('Track document not found:', trackId);
+            const storageRef = ref(storage, `users/${userId}/tracks/${Date.now()}_${file.name}`);
+            try {
+                const snapshot = await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
+                await addDoc(tracksRef, { fileName: file.name, fileUrl: downloadURL, createdAt: serverTimestamp() });
+            } catch (error) {
+                console.error("Error uploading file:", error);
             }
         }
-
+        async function removeTrack(albumId, trackId) { if (window.itemsCollectionRef) { await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId)); } }
         async function updateItem(id, data) { if(window.itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data); }
         async function deleteItem(id) { if(window.itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id)); }
 
@@ -811,258 +449,43 @@
 
         // --- UI (Menus & Modals) ---
         function showContextMenu(menu, x, y) { hideAllContextMenus(); if(menu === contextMenuItem) { document.getElementById('edit-btn').disabled = contextTarget.data.type === 'folder'; } const menuWidth = menu.offsetWidth, menuHeight = menu.offsetHeight, screenWidth = window.innerWidth, screenHeight = window.innerHeight; menu.style.left = `${Math.min(x, screenWidth - menuWidth - 10)}px`; menu.style.top = `${Math.min(y, screenHeight - menuHeight - 10)}px`; menu.classList.remove('hidden'); setTimeout(() => menu.classList.remove('opacity-0', 'scale-95'), 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
-        function handleOutsideClick(event) { 
-          if (!settingsModal.contains(event.target) && !settingsModal.classList.contains('hidden')) {
-              hideModal(settingsModal);
-          }
-          if (!contextMenuBg.contains(event.target) && !contextMenuItem.contains(event.target) && !contextMenuTrack.contains(event.target)) {
-            hideAllContextMenus();
-          }
-        }
-        function hideAllContextMenus() { [contextMenuBg, contextMenuItem, contextMenuTrack].forEach(m => { if (!m.classList.contains('hidden')) { m.classList.add('opacity-0', 'scale-95'); setTimeout(() => m.classList.add('hidden'), 200); } }); }
-        function showModal(modal) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); document.addEventListener('mousedown', (e) => { 
-            // Only add a listener if a modal is actually open
-            if (!e.target.closest('.modal')) {
-                hideModal(modal);
-            }
-        });}
-        function hideModal(modal) { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200);}
+        function handleOutsideClick(event) { const isClickInsideMenu = contextMenuBg.contains(event.target) || contextMenuItem.contains(event.target) || contextMenuTrack.contains(event.target); if (!isClickInsideMenu) { hideAllContextMenus(); } else { document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); } }
+        function hideAllContextMenus() { document.removeEventListener('mousedown', handleOutsideClick, { capture: true }); [contextMenuBg, contextMenuItem, contextMenuTrack].forEach(m => { if (!m.classList.contains('hidden')) { m.classList.add('opacity-0', 'scale-95'); setTimeout(() => m.classList.add('hidden'), 200); } }); }
+        function showModal(modal) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); }
+        function hideModal(modal) { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); }
         function showConfirmation(title, message, isAlert = false) { return new Promise((resolve) => { const confirmTitle = document.getElementById('confirm-title'), confirmMessage = document.getElementById('confirm-message'), okBtn = document.getElementById('confirm-ok-btn'), cancelBtn = document.getElementById('confirm-cancel-btn'); confirmTitle.textContent = title; confirmMessage.textContent = message; if(isAlert) { okBtn.textContent = 'OK'; okBtn.className = 'py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors'; cancelBtn.classList.add('hidden'); } else { okBtn.textContent = 'Delete'; okBtn.className = 'py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors'; cancelBtn.classList.remove('hidden'); } showModal(confirmModal); const okHandler = () => { hideModal(confirmModal); resolve(true); cleanup(); }; const cancelHandler = () => { hideModal(confirmModal); resolve(false); cleanup(); }; function cleanup() { okBtn.removeEventListener('click', okHandler); cancelBtn.removeEventListener('click', cancelHandler); } okBtn.addEventListener('click', okHandler, { once: true }); cancelBtn.addEventListener('click', cancelHandler, { once: true }); }); }
 
-        // --- State Persistence ---
-        function saveState() {
-            if (!auth.currentUser) return;
-            const state = {
-                player: currentTrackIndex > -1 ? {
-                    playlist: currentPlaylist,
-                    trackIndex: currentTrackIndex,
-                    currentTime: audio.currentTime
-                } : null
-            };
-            localStorage.setItem(`project1_state_${auth.currentUser.uid}`, JSON.stringify(state));
-        }
-
         // --- Event Listeners ---
-        window.addEventListener('hashchange', handleHashChange);
-        window.addEventListener('beforeunload', saveState);
-
-        document.getElementById('grid-view').addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); if (auth.currentUser) showContextMenu(contextMenuBg, e.clientX, e.clientY); });
+        window.addEventListener('popstate', (event) => { if (event.state) { if (currentView === 'album') { navigationStack.pop(); } navigationStack.pop(); if (navigationStack.length === 0) navigationStack.push({id: 'root', title: 'project_1'}); updateView('grid'); } else { navigationStack = [{id: 'root', title: 'project_1'}]; updateView('grid'); } });
+        document.getElementById('grid-view').addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showContextMenu(contextMenuBg, e.clientX, e.clientY); });
         backButton.addEventListener('click', navigateBack);
-        
-        // --- Upload Listeners ---
-        dropZone.addEventListener('click', () => {
-            audioUpload.click();
-        });
-        audioUpload.addEventListener('change', (e) => {
-            for (const file of e.target.files) {
-                if (file.type.startsWith('audio/')) {
-                    addTrack(currentAlbum.id, file);
-                }
-            }
-        });
-        dropZone.addEventListener('drop', e => { 
-            e.preventDefault(); 
-            e.stopPropagation();
-            dropZone.classList.remove('bg-gray-700', 'border-indigo-500');
-            for (const file of e.dataTransfer.files) { 
-                if (file.type.startsWith('audio/')) { 
-                    addTrack(currentAlbum.id, file); 
-                } 
-            } 
-        });
-        ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, e => { 
-            e.preventDefault(); 
-            e.stopPropagation();
-            dropZone.classList.add('bg-gray-700', 'border-indigo-500');
-        }, false));
-        ['dragleave'].forEach(ev => dropZone.addEventListener(ev, e => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropZone.classList.remove('bg-gray-700', 'border-indigo-500');
-        }, false));
-        
+        dropZone.addEventListener('drop', e => { for (const file of e.dataTransfer.files) { if (file.type.startsWith('audio/')) { addTrack(currentAlbum.id, file); } } });
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, false));
+        ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.add('bg-gray-700', 'border-indigo-500'), false));
+        ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove('bg-gray-700', 'border-indigo-500'), false));
         playPauseBtn.addEventListener('click', togglePlayPause);
         nextBtn.addEventListener('click', playNext);
         prevBtn.addEventListener('click', playPrev);
-        
-        shuffleBtn.addEventListener('click', () => { 
-            isShuffle = !isShuffle; 
-            shuffleBtn.classList.toggle('text-green-500', isShuffle);
-            shuffleBtn.classList.toggle('text-gray-400', !isShuffle);
-        });
-        
-        loopBtn.addEventListener('click', () => {
-            isLoop = !isLoop;
-            audio.loop = isLoop;
-            loopBtn.classList.toggle('text-green-500', isLoop);
-            loopBtn.classList.toggle('text-gray-400', !isLoop);
-        });
-        
-        audio.addEventListener('timeupdate', () => { 
-            if (audio.duration) { 
-                currentTimeEl.textContent = formatTime(audio.currentTime); 
-                totalTimeEl.textContent = formatTime(audio.duration); 
-                const progressPercent = (audio.currentTime / audio.duration) * 100;
-                progressBar.style.width = `${progressPercent}%`;
-            } 
-        });
-        
+        shuffleBtn.addEventListener('click', () => { isShuffle = !isShuffle; shuffleBtn.classList.toggle('text-green-500', isShuffle); });
+        audio.addEventListener('timeupdate', () => { if (audio.duration) { document.getElementById('current-time').textContent = formatTime(audio.currentTime); document.getElementById('total-time').textContent = formatTime(audio.duration); } });
         audio.addEventListener('ended', playNext);
-        
-        progressBarContainer.addEventListener('click', (e) => { 
-            if (!audio.duration) return; 
-            const rect = progressBarContainer.getBoundingClientRect(); 
-            const percent = (e.clientX - rect.left) / rect.width; 
-            audio.currentTime = percent * audio.duration; 
-        });
-
-        document.getElementById('add-album-btn').addEventListener('click', e => { e.preventDefault(); if (auth.currentUser) createItem('album'); hideAllContextMenus(); });
-        document.getElementById('add-folder-btn').addEventListener('click', e => { e.preventDefault(); if (auth.currentUser) createItem('folder'); hideAllContextMenus(); });
+        waveformCanvas.addEventListener('click', (e) => { if (!audio.duration) return; const rect = waveformCanvas.getBoundingClientRect(); const percent = (e.clientX - rect.left) / rect.width; audio.currentTime = percent * audio.duration; });
+        document.getElementById('add-album-btn').addEventListener('click', e => { e.preventDefault(); createItem('album'); hideAllContextMenus(); });
+        document.getElementById('add-folder-btn').addEventListener('click', e => { e.preventDefault(); createItem('folder'); hideAllContextMenus(); });
         document.getElementById('rename-btn').addEventListener('click', e => { e.preventDefault(); document.getElementById('rename-input').value = contextTarget.data.title; showModal(renameModal); hideAllContextMenus(); });
         document.getElementById('edit-btn').addEventListener('click', e => { e.preventDefault(); if(contextTarget.data.type === 'album') { document.getElementById('edit-title').value = contextTarget.data.title; document.getElementById('edit-artist').value = contextTarget.data.artist; document.getElementById('edit-image-url').value = contextTarget.data.imageUrl; showModal(editModal); } hideAllContextMenus(); });
         document.getElementById('delete-btn').addEventListener('click', async e => { e.preventDefault(); hideAllContextMenus(); const confirmed = await showConfirmation('Delete Item?', `You are about to delete "${contextTarget.data.title}". This cannot be undone.`); if (confirmed) { deleteItem(contextTarget.id); } });
         document.getElementById('track-remove-btn').addEventListener('click', e => { e.preventDefault(); if (trackContextTarget) { removeTrack(currentAlbum.id, trackContextTarget.id); } hideAllContextMenus(); });
         suggestArtBtn.addEventListener('click', generateCoverArt);
-        
-        document.getElementById('rename-form').addEventListener('submit', e => { 
-            e.preventDefault(); 
-            const newTitle = document.getElementById('rename-input').value.trim();
-            if (!newTitle) return;
-
-            const isDuplicate = currentItemDocs.some(item =>
-                item.id !== contextTarget.id && item.data.title.toLowerCase() === newTitle.toLowerCase()
-            );
-
-            if (isDuplicate) {
-                showConfirmation("Duplicate Name", "An item with this name already exists in this folder.", true);
-                return;
-            }
-
-            if (newTitle) updateItem(contextTarget.id, { title: newTitle }); 
-            hideModal(renameModal); 
-        });
-
+        document.getElementById('rename-form').addEventListener('submit', e => { e.preventDefault(); const newTitle = document.getElementById('rename-input').value; if (newTitle) updateItem(contextTarget.id, { title: newTitle }); hideModal(renameModal); });
         document.getElementById('edit-form').addEventListener('submit', e => { e.preventDefault(); const newData = { title: document.getElementById('edit-title').value, artist: document.getElementById('edit-artist').value, imageUrl: document.getElementById('edit-image-url').value }; if (newData.title && newData.artist && newData.imageUrl) updateItem(contextTarget.id, newData); hideModal(editModal); });
         document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => { hideModal(renameModal); hideModal(editModal); }));
         document.getElementById('confirm-cancel-btn').addEventListener('click', () => hideModal(confirmModal));
-        const settingsCloseBtn = document.getElementById('settings-close-btn');
-        settingsCloseBtn.addEventListener('click', () => hideModal(settingsModal));
-
-        // --- Google Drive Integration (Re-enabled) ---
-        // This is a placeholder since the full OAuth flow cannot be done in this environment.
-        // The code simulates a connection/disconnection.
-        let isDriveConnected = false;
-        
-        function updateDriveUI() {
-            const connectDriveBtn = document.getElementById('connect-drive-btn');
-            if (isDriveConnected) {
-                connectDriveBtn.textContent = 'Disconnect';
-                connectDriveBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-                connectDriveBtn.classList.add('bg-red-600', 'hover:bg-red-700');
-            } else {
-                connectDriveBtn.textContent = 'Connect';
-                connectDriveBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-                connectDriveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-            }
-        }
-        
-        function handleDriveAuthClick() {
-            if (isDriveConnected) {
-                // Simulate token revocation
-                isDriveConnected = false;
-                updateDriveUI();
-                hideModal(settingsModal); // Close the settings modal after disconnecting
-                showConfirmation("Google Drive Disconnected", "You have been disconnected from Google Drive.", true);
-            } else {
-                // Simulate OAuth flow
-                // In a real app, this would redirect to Google's auth page.
-                isDriveConnected = true;
-                updateDriveUI();
-                hideModal(settingsModal); // Close the settings modal after connecting
-                showConfirmation("Google Drive Connected", "You have successfully connected to Google Drive!", true);
-            }
-        }
-        
-        document.getElementById('connect-drive-btn').addEventListener('click', handleDriveAuthClick);
-
-
-        // --- Discord Integration (Simulated) ---
-        let isDiscordConnected = false;
-        
-        function updateDiscordUI() {
-            const connectDiscordBtn = document.getElementById('connect-discord-btn');
-            if (isDiscordConnected) {
-                connectDiscordBtn.textContent = 'Disconnect';
-                connectDiscordBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-                connectDiscordBtn.classList.add('bg-red-600', 'hover:bg-red-700');
-            } else {
-                connectDiscordBtn.textContent = 'Connect';
-                connectDiscordBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-                connectDiscordBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-            }
-        }
-
-        async function handleDiscordAuthClick() {
-            if (isDiscordConnected) {
-                // Simulate token revocation
-                const confirmed = await showConfirmation('Disconnect Discord?', 'Are you sure you want to disconnect from Discord?', false);
-                if (confirmed) {
-                    isDiscordConnected = false;
-                    updateDiscordUI();
-                    console.log('Simulated Discord token revocation.');
-                }
-            } else {
-                // Simulate OAuth flow
-                const confirmed = await showConfirmation('Connect Discord?', 'This will open a new window to authorize with Discord.', true);
-                if (confirmed) {
-                    isDiscordConnected = true;
-                    updateDiscordUI();
-                    console.log('Simulated Discord connection.');
-                }
-            }
-        }
-        
-        document.getElementById('connect-discord-btn').addEventListener('click', handleDiscordAuthClick);
 
         // --- Initialize ---
-        function initializeAppState() {
-            if (!auth.currentUser) return; // Wait for user to sign in
-            const savedStateJSON = localStorage.getItem(`project1_state_${auth.currentUser.uid}`);
-            if (savedStateJSON) {
-                try {
-                    const savedState = JSON.parse(savedStateJSON);
-                    
-                    if (savedState.player) {
-                        currentPlaylist = savedState.player.playlist;
-                        currentTrackIndex = savedState.player.trackIndex;
-                        const track = currentPlaylist[currentTrackIndex];
-                        
-                        audio.src = track.fileUrl;
-                        audio.addEventListener('loadedmetadata', () => {
-                            audio.currentTime = savedState.player.currentTime;
-                            if (audio.duration) {
-                                currentTimeEl.textContent = formatTime(audio.currentTime);
-                                totalTimeEl.textContent = formatTime(audio.duration);
-                                const progressPercent = (audio.currentTime / audio.duration) * 100;
-                                progressBar.style.width = `${progressPercent}%`;
-                            }
-                        }, { once: true });
-
-                        updatePlayerUI(track);
-                        playerBar.classList.add('visible');
-                        updatePlayPauseIcon();
-                    }
-                } catch (error) {
-                    console.error("Failed to restore player state:", error);
-                    localStorage.removeItem(`project1_state_${auth.currentUser.uid}`);
-                }
-            }
-            
-            // Handle initial navigation based on hash
-            handleHashChange();
-        }
-
         initializeFirebase();
+        history.replaceState({ view: 'grid', folderId: 'root', title: 'project_1' }, 'project_1', './');
+        updateView('grid');
     </script>
 </body>
 </html>
