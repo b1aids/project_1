@@ -191,14 +191,11 @@
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     userId = user.uid;
-                    // IMPORTANT: Define collection path AFTER getting the userId
-                    // This creates a private collection for each anonymous user.
                     itemsCollectionRef = collection(db, `users/${userId}/items`);
                     listenForItems();
                 } else {
-                    // Handle sign-out or initial state
                     if (itemsUnsubscribe) itemsUnsubscribe();
-                    itemGrid.innerHTML = ''; // Clear the grid
+                    itemGrid.innerHTML = '';
                 }
             });
 
@@ -220,7 +217,7 @@
 
         function navigateBack() {
              if (currentView === 'album') {
-                history.back(); // This will trigger the popstate listener
+                history.back();
             } else if (navigationStack.length > 1) {
                 history.back();
             }
@@ -233,7 +230,7 @@
             updateView('album');
         }
 
-        function updateView(view, state = {}) {
+        function updateView(view) {
             currentView = view;
             if (itemsUnsubscribe) { itemsUnsubscribe(); itemsUnsubscribe = null; }
             if (tracksUnsubscribe) { tracksUnsubscribe(); tracksUnsubscribe = null; }
@@ -303,7 +300,7 @@
         // --- Firestore Logic ---
         function listenForItems() {
             if (!itemsCollectionRef) return;
-            if (itemsUnsubscribe) itemsUnsubscribe(); // Unsubscribe from previous listener
+            if (itemsUnsubscribe) itemsUnsubscribe();
             const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId));
             itemsUnsubscribe = onSnapshot(q, snapshot => {
                 const sorted = snapshot.docs.sort((a, b) => (a.data().createdAt?.toDate() || 0) - (b.data().createdAt?.toDate() || 0));
@@ -405,36 +402,56 @@
                 suggestArtBtn.disabled = false;
             }
         }
-
+        
         // --- UI (Menus & Modals) ---
+
+        // ** REWRITTEN CONTEXT MENU LOGIC **
+        // This function now adds a temporary listener to close the menu when clicking away.
         function showContextMenu(menu, x, y) {
-            hideAllContextMenus();
-            // Disable edit button for folders
+            hideAllContextMenus(); // Close any other open menus first.
+            
             if(menu === contextMenuItem) {
-                const editBtn = document.getElementById('edit-btn');
-                editBtn.disabled = contextTarget.data.type === 'folder';
+                document.getElementById('edit-btn').disabled = contextTarget.data.type === 'folder';
             }
             
-            // Boundary checks
             const menuWidth = menu.offsetWidth;
             const menuHeight = menu.offsetHeight;
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
 
-            if (x + menuWidth > screenWidth) {
-                x = screenWidth - menuWidth - 10;
-            }
-             if (y + menuHeight > screenHeight) {
-                y = screenHeight - menuHeight - 10;
-            }
-
-            menu.style.left = `${x}px`;
-            menu.style.top = `${y}px`;
+            menu.style.left = `${Math.min(x, screenWidth - menuWidth - 10)}px`;
+            menu.style.top = `${Math.min(y, screenHeight - menuHeight - 10)}px`;
+            
             menu.classList.remove('hidden');
             setTimeout(() => menu.classList.remove('opacity-0', 'scale-95'), 10);
+
+            // Add a one-time listener to the document to handle clicks outside the menu.
+            document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true });
         }
 
-        function hideAllContextMenus() { [contextMenuBg, contextMenuItem].forEach(m => { m.classList.add('opacity-0', 'scale-95'); setTimeout(() => m.classList.add('hidden'), 200); }); }
+        // This function is the temporary listener. It checks if the click was outside,
+        // and if so, it hides the menus. It's removed automatically after one click.
+        function handleOutsideClick(event) {
+            const isClickInsideMenu = contextMenuBg.contains(event.target) || contextMenuItem.contains(event.target);
+            if (!isClickInsideMenu) {
+                hideAllContextMenus();
+            } else {
+                // If the click was inside, the listener is already gone, but we need to re-add it
+                // to catch the *next* outside click.
+                 document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true });
+            }
+        }
+        
+        // This function now also ensures any temporary listeners are removed.
+        function hideAllContextMenus() {
+            document.removeEventListener('mousedown', handleOutsideClick, { capture: true });
+            [contextMenuBg, contextMenuItem].forEach(m => {
+                if (!m.classList.contains('hidden')) {
+                    m.classList.add('opacity-0', 'scale-95');
+                    setTimeout(() => m.classList.add('hidden'), 200);
+                }
+            });
+        }
         
         function showModal(modal) {
             modal.classList.remove('hidden');
@@ -497,30 +514,19 @@
         window.addEventListener('popstate', (event) => {
             if (event.state) {
                  if (currentView === 'album') {
-                    navigationStack.pop(); // remove album "view" from stack
+                    navigationStack.pop();
                  }
                 navigationStack.pop();
                 if (navigationStack.length === 0) navigationStack.push({id: 'root', title: 'project_1'});
                 updateView('grid');
             } else {
-                // This case handles going back to the initial state
                 navigationStack = [{id: 'root', title: 'project_1'}];
                 updateView('grid');
             }
         });
 
         document.getElementById('grid-view').addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showContextMenu(contextMenuBg, e.clientX, e.clientY); });
-        window.addEventListener('mousedown', (event) => {
-            // Check if the click is on a context menu or a child of a context menu
-            const isInsideMenu = [contextMenuBg, contextMenuItem].some(menu => menu.contains(event.target));
-            
-            // If the click is outside all menus, hide them
-            if (!isInsideMenu) {
-                hideAllContextMenus();
-            }
-        });
-
-
+        
         backButton.addEventListener('click', navigateBack);
         
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, false));
