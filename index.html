@@ -495,7 +495,11 @@
         }
         
         function addTrack(albumId, file) {
-            if (!window.itemsCollectionRef || !window.userId) return;
+            console.log('Attempting to upload track:', file.name, 'to album:', albumId);
+            if (!window.itemsCollectionRef || !window.userId) {
+                console.error("Upload failed: User or database not initialized.");
+                return;
+            }
             
             const trackList = document.getElementById('track-list');
             const placeholderEl = document.createElement('div');
@@ -513,9 +517,10 @@
                     progressSpan.textContent = `(${Math.round(progress)}%)`;
                 }, 
                 (error) => {
-                    console.error("Error uploading file:", error);
+                    console.error("Firebase Storage upload failed. Code:", error.code, "Message:", error.message);
+                    console.error(error); // Log the full error object
                     placeholderEl.remove();
-                    showConfirmation("Upload Failed", `Could not upload ${file.name}. Please check your connection and Firebase Storage rules.`, true);
+                    showConfirmation("Upload Failed", `Could not upload ${file.name}. Error: ${error.code}. Please check your connection and Firebase Storage rules.`, true);
                 }, 
                 () => {
                     getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
