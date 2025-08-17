@@ -261,8 +261,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- State Management ---
         let currentView = 'grid', currentFolderId = 'root', currentAlbum = null;
@@ -341,16 +341,23 @@
             const app = initializeApp(firebaseConfig);
             window.db = getFirestore(app);
             window.auth = getAuth(app);
+            window.storage = getStorage(app);
             
             // onAuthStateChanged is the central place to handle user state.
             onAuthStateChanged(auth, user => {
                 if (user) {
                     // User is signed in.
                     window.userId = user.uid;
-                    // Check if the user is anonymous. If so, don't show a sign-out button.
-                    const isAnon = user.isAnonymous;
-                    window.itemsCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/items`);
-                    updateUserProfile(user, !isAnon);
+                    // Define both the old and new collection paths for potential migration
+                    const newCollectionPath = `artifacts/${appId}/users/${userId}/items`;
+                    const oldCollectionPath = `users/${userId}/items`;
+
+                    // Check if the old path has data and the new one doesn't.
+                    // If so, migrate the data.
+                    migrateData(oldCollectionPath, newCollectionPath, user);
+                    
+                    window.itemsCollectionRef = collection(db, newCollectionPath);
+                    updateUserProfile(user);
                     initializeAppState();
                 } else {
                     // User is signed out. Display sign-in UI.
@@ -374,6 +381,53 @@
             });
         }
 
+        // --- Data Migration Logic ---
+        async function migrateData(oldPath, newPath, user) {
+            const oldCollectionRef = collection(db, oldPath);
+            const newCollectionRef = collection(db, newPath);
+
+            try {
+                // Check if the new collection is empty
+                const newDocs = await getDocs(newCollectionRef);
+                if (!newDocs.empty) {
+                    console.log("New collection path already has data, no migration needed.");
+                    return;
+                }
+
+                // Check if the old collection has data
+                const oldDocs = await getDocs(oldCollectionRef);
+                if (oldDocs.empty) {
+                    console.log("Old collection path is empty, no migration needed.");
+                    return;
+                }
+
+                console.log("Migrating data from old path to new path...");
+                for (const oldDoc of oldDocs.docs) {
+                    const docData = oldDoc.data();
+                    // Add the document to the new path
+                    await setDoc(doc(newCollectionRef, oldDoc.id), docData);
+
+                    // Check for nested 'tracks' subcollection and migrate it as well
+                    const oldTracksRef = collection(db, `${oldPath}/${oldDoc.id}/tracks`);
+                    const newTracksRef = collection(db, `${newPath}/${oldDoc.id}/tracks`);
+                    const oldTracks = await getDocs(oldTracksRef);
+                    if (!oldTracks.empty) {
+                        for (const oldTrack of oldTracks.docs) {
+                            await setDoc(doc(newTracksRef, oldTrack.id), oldTrack.data());
+                            // Optional: delete old tracks
+                            await deleteDoc(doc(oldTracksRef, oldTrack.id));
+                        }
+                    }
+                    // Optional: delete the old top-level document
+                    await deleteDoc(doc(oldCollectionRef, oldDoc.id));
+                }
+                console.log("Data migration complete.");
+
+            } catch (error) {
+                console.error("Error during data migration:", error);
+            }
+        }
+
         // --- Authentication ---
         const provider = new GoogleAuthProvider();
 
@@ -390,17 +444,6 @@
             signOut(auth).catch(error => {
                 console.error("Sign out error:", error);
             });
-            // Also revoke Google Drive token
-            if (isDriveConnected && gapi.client.getToken() !== null) {
-                google.accounts.oauth2.revoke(gapi.client.getToken().access_token, () => {
-                    console.log('Google Drive token revoked.');
-                    isDriveConnected = false;
-                    updateDriveUI();
-                });
-            }
-            // Revoke Discord token (simulated)
-            isDiscordConnected = false;
-            updateDiscordUI();
         }
 
         function updateUserProfile(user) {
@@ -412,8 +455,6 @@
                     document.getElementById('settings-pfp').src = user.photoURL;
                     document.getElementById('settings-username').textContent = user.displayName;
                     showModal(settingsModal);
-                    updateDriveUI();
-                    updateDiscordUI();
                 });
                 document.getElementById('sign-out-btn').addEventListener('click', signOutUser);
 
@@ -422,97 +463,7 @@
             }
         }
         
-        // --- Google Drive Integration ---
-        function updateDriveUI() {
-            if (isDriveConnected) {
-                connectDriveBtn.textContent = 'Disconnect';
-                connectDriveBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-                connectDriveBtn.classList.add('bg-red-600', 'hover:bg-red-700');
-            } else {
-                connectDriveBtn.textContent = 'Connect';
-                connectDriveBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-                connectDriveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-            }
-        }
-        
-        function handleAuthClick() {
-            if (gapiLoaded && gisLoaded) {
-                if (isDriveConnected) {
-                    google.accounts.oauth2.revoke(gapi.client.getToken().access_token, () => {
-                        console.log('Google Drive token revoked.');
-                        isDriveConnected = false;
-                        updateDriveUI();
-                    });
-                } else {
-                    tokenClient.requestAccessToken({prompt: 'consent'});
-                }
-            } else {
-                showConfirmation("API Not Loaded", "Google APIs are still loading. Please try again in a moment.", true);
-            }
-        }
-
-        function handleTokenResponse(resp) {
-            if (resp.error !== undefined) {
-                throw (resp);
-            }
-            gapi.client.setToken(resp);
-            isDriveConnected = true;
-            updateDriveUI();
-        }
-
-        async function initGis() {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: (resp) => {
-                    try {
-                        handleTokenResponse(resp);
-                    } catch(err) {
-                        console.error(err);
-                    }
-                },
-            });
-            gisLoaded = true;
-        }
-
-        async function initGapi() {
-            await gapi.client.init({});
-            await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
-            gapiLoaded = true;
-        }
-
-        // --- Discord Integration ---
-        function updateDiscordUI() {
-            if (isDiscordConnected) {
-                connectDiscordBtn.textContent = 'Disconnect';
-                connectDiscordBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-                connectDiscordBtn.classList.add('bg-red-600', 'hover:bg-red-700');
-            } else {
-                connectDiscordBtn.textContent = 'Connect';
-                connectDiscordBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-                connectDiscordBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-            }
-        }
-
-        async function handleDiscordAuthClick() {
-            if (isDiscordConnected) {
-                // Simulate token revocation
-                const confirmed = await showConfirmation('Disconnect Discord?', 'Are you sure you want to disconnect from Discord?', false);
-                if (confirmed) {
-                    isDiscordConnected = false;
-                    updateDiscordUI();
-                    console.log('Simulated Discord token revocation.');
-                }
-            } else {
-                // Simulate OAuth flow
-                const confirmed = await showConfirmation('Connect Discord?', 'This will open a new window to authorize with Discord.', true);
-                if (confirmed) {
-                    isDiscordConnected = true;
-                    updateDiscordUI();
-                    console.log('Simulated Discord connection.');
-                }
-            }
-        }
+        // --- Google Drive/Discord placeholders removed for clarity ---
 
         // --- Navigation & View Management (Hash-based) ---
         function navigateTo(folderId) { 
@@ -706,8 +657,7 @@
             await addDoc(itemsCollectionRef, data); 
         }
         
-        function addTrack(albumId, file) {
-            console.log('Attempting to upload track:', file.name, 'to album:', albumId);
+        async function addTrack(albumId, file) {
             if (!window.itemsCollectionRef || !window.userId) {
                 console.error("Upload failed: User or database not initialized.");
                 return;
@@ -744,7 +694,37 @@
             );
         }
 
-        async function removeTrack(albumId, trackId) { if (window.itemsCollectionRef) { await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId)); } }
+        async function removeTrack(albumId, trackId) { 
+            if (!window.itemsCollectionRef || !window.userId) return;
+            
+            const trackDocRef = doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId);
+            const trackDoc = await getDoc(trackDocRef);
+
+            if (trackDoc.exists()) {
+                const trackData = trackDoc.data();
+                const fileUrl = trackData.fileUrl;
+                const fileRef = ref(storage, fileUrl);
+
+                // Delete the file from Firebase Storage
+                try {
+                    await deleteObject(fileRef);
+                    console.log('File deleted from Firebase Storage:', fileUrl);
+                } catch (error) {
+                    console.error('Failed to delete file from Firebase Storage:', error);
+                }
+
+                // Delete the document from Firestore
+                try {
+                    await deleteDoc(trackDocRef);
+                    console.log('Track document deleted from Firestore:', trackId);
+                } catch (error) {
+                    console.error('Failed to delete track document from Firestore:', error);
+                }
+            } else {
+                console.error('Track document not found:', trackId);
+            }
+        }
+
         async function updateItem(id, data) { if(window.itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data); }
         async function deleteItem(id) { if(window.itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id)); }
 
@@ -786,8 +766,6 @@
         
         // --- Upload Listeners ---
         dropZone.addEventListener('click', () => {
-            // This is where you would initiate a Google Drive Picker if you were to implement it.
-            // For now, it opens the local file picker.
             audioUpload.click();
         });
         audioUpload.addEventListener('change', (e) => {
