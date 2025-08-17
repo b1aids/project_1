@@ -325,7 +325,7 @@
         // --- Backend Setup ---
         let db, auth, itemsCollectionRef, firebaseUserId;
         const supabaseUrl = 'https://oufwtprqjvjsnvxomhwy.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91Znd0cHJxanZqc252eG9taHd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0NDU3NDAsImV4cCI6MjA3MTAyMTc0MH0.VRueo641ZlaT_VF3_6bzu_BUhpuUghASle3xj7oaeN4';
+        const supabaseKey = '';
         const supabase = createClient(supabaseUrl, supabaseKey);
 
         async function initializeFirebase() {
@@ -522,7 +522,7 @@
             trackList.innerHTML = '';
             document.getElementById('album-view-meta').textContent = `${tracks.length} track${tracks.length !== 1 ? 's' : ''}`;
             dropMessage.classList.toggle('hidden', tracks.length > 0);
-            currentPlaylist = tracks.map(track => ({ docId: track.id, fileName: track.file_name, fileUrl: track.file_url, artist: currentAlbum.data.artist, albumTitle: currentAlbum.data.title, albumArt: currentAlbum.data.image_url }));
+            currentPlaylist = tracks.map(track => ({ docId: track.id, fileName: track.file_name, fileUrl: track.file_url, artist: currentAlbum.data.artist, albumTitle: currentAlbum.data.title, albumArt: currentAlbum.data.imageUrl }));
             currentPlaylist.forEach((track, index) => {
                 const el = document.createElement('div');
                 el.className = 'track-item flex items-center p-2 rounded-md hover:bg-gray-700 text-gray-400 transition-colors cursor-pointer relative';
