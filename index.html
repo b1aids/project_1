@@ -130,7 +130,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- State Management ---
@@ -144,7 +144,7 @@
         let itemsUnsubscribe = null;
 
         // --- App & Firebase State ---
-        let db, auth, userId, appId;
+        let db, auth, userId;
         let itemsCollectionRef; // Will be initialized after auth
 
         // --- DOM Elements ---
@@ -163,14 +163,27 @@
 
         // --- Firebase Setup (Secure & Dynamic) ---
         async function initializeFirebase() {
-            // Use environment variables provided by the platform
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            /* --- PASTE YOUR FIREBASE CONFIGURATION HERE --- */
+            // You can get this from your Firebase project settings.
+            // Go to Project Settings > General > Your apps > Web app > Firebase SDK snippet > Config
+            const firebaseConfig = {
+                // apiKey: "...",
+                // authDomain: "...",
+                // projectId: "...",
+                // storageBucket: "...",
+                // messagingSenderId: "...",
+                // appId: "..."
+            };
+            /* ---------------------------------------------- */
 
             if (!firebaseConfig.apiKey) {
                 console.error("Firebase config is missing!");
-                // Display an error to the user in the UI
-                document.body.innerHTML = '<div class="flex items-center justify-center h-screen text-red-500">Error: Firebase configuration is missing.</div>';
+                document.body.innerHTML = `<div class="flex items-center justify-center h-screen text-center p-4">
+                    <div class="bg-red-900 border border-red-500 text-white p-6 rounded-lg">
+                        <h2 class="text-2xl font-bold mb-2">Error: Firebase Configuration Missing</h2>
+                        <p>Please paste your Firebase config object into the 'initializeFirebase' function in the script.</p>
+                    </div>
+                </div>`;
                 return;
             }
 
@@ -182,7 +195,8 @@
                 if (user) {
                     userId = user.uid;
                     // IMPORTANT: Define collection path AFTER getting the userId
-                    itemsCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/items`);
+                    // This creates a private collection for each anonymous user.
+                    itemsCollectionRef = collection(db, `users/${userId}/items`);
                     listenForItems();
                 } else {
                     // Handle sign-out or initial state
@@ -192,14 +206,10 @@
             });
 
             try {
-                if (typeof __initial_auth_token !== 'undefined') {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                await signInAnonymously(auth);
             } catch (error) {
-                console.error("Authentication failed:", error);
-                document.body.innerHTML = '<div class="flex items-center justify-center h-screen text-red-500">Error: Authentication failed. Please refresh.</div>';
+                console.error("Anonymous authentication failed:", error);
+                document.body.innerHTML = '<div class="flex items-center justify-center h-screen text-red-500">Error: Authentication failed. Please check your Firebase security rules.</div>';
             }
         }
 
