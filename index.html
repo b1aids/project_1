@@ -104,9 +104,17 @@
                     <!-- This will be populated by JS -->
                 </div>
             </header>
+            
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" class="flex-grow flex items-center justify-center p-8 hidden">
+                <div class="text-center">
+                    <div class="spinner w-12 h-12 mb-4 mx-auto"></div>
+                    <p class="text-gray-400">Loading your library...</p>
+                </div>
+            </div>
 
             <!-- Grid View -->
-            <main id="grid-view" class="flex-grow p-4 md:p-8 overflow-y-auto no-scrollbar">
+            <main id="grid-view" class="flex-grow p-4 md:p-8 overflow-y-auto no-scrollbar hidden">
                 <div id="item-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-8"></div>
             </main>
 
@@ -127,6 +135,7 @@
                         <div id="track-list" class="space-y-1"></div>
                         <div id="drop-zone" class="mt-4 text-center p-8 border-2 border-dashed border-gray-700 rounded-lg transition-all cursor-pointer hover:bg-gray-800 hover:border-indigo-500">
                             <p class="text-gray-500">Drag & Drop Audio Files Here or Click to Upload</p>
+                            <p id="drop-message" class="text-gray-500 mt-2 hidden">No tracks in this album. Add one!</p>
                             <input type="file" id="audio-upload" accept="audio/*" class="hidden" multiple>
                         </div>
                     </div>
@@ -266,6 +275,7 @@
         let itemCount = 0;
         let tracksUnsubscribe = null, itemsUnsubscribe = null;
         let currentItemDocs = []; // To store current items for duplicate checks
+        let isLoading = false;
         
         // --- Player State ---
         const audio = new Audio();
@@ -299,6 +309,8 @@
         const currentTimeEl = document.getElementById('current-time');
         const totalTimeEl = document.getElementById('total-time');
         const userProfileDiv = document.getElementById('user-profile');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const dropMessage = document.getElementById('drop-message');
         
         // --- Firebase Setup ---
         async function initializeFirebase() {
@@ -397,14 +409,20 @@
                 currentFolderId = id;
                 updateView('grid');
             } else if (type === 'album' && id) {
-                const albumDocRef = doc(db, itemsCollectionRef.path, id);
-                const albumDoc = await getDoc(albumDocRef);
-                if (albumDoc.exists()) {
-                    currentAlbum = { id: albumDoc.id, data: albumDoc.data() };
-                    currentFolderId = currentAlbum.data.parentId;
-                    updateView('album');
-                } else {
-                    console.error("Album not found, redirecting to root.");
+                try {
+                    const albumDocRef = doc(db, itemsCollectionRef.path, id);
+                    const albumDoc = await getDoc(albumDocRef);
+                    if (albumDoc.exists()) {
+                        currentAlbum = { id: albumDoc.id, data: albumDoc.data() };
+                        currentFolderId = currentAlbum.data.parentId;
+                        updateView('album');
+                    } else {
+                        console.error("Album not found, redirecting to root.");
+                        location.hash = 'folder/root';
+                    }
+                } catch (error) {
+                    console.error("Error fetching album:", error);
+                    showConfirmation("Error", "Failed to load album details. Please try again later.", true);
                     location.hash = 'folder/root';
                 }
             } else {
@@ -418,6 +436,7 @@
             if (tracksUnsubscribe) { tracksUnsubscribe(); tracksUnsubscribe = null; }
             
             backButton.style.display = (currentFolderId !== 'root' || view === 'album') ? 'flex' : 'none';
+            setLoadingState(true);
 
             if (view === 'grid') {
                 headerTitle.textContent = currentFolderId === 'root' ? 'project_1' : '...';
@@ -436,9 +455,26 @@
                 listenForTracks(currentAlbum.id);
             }
         }
+        
+        function setLoadingState(loading) {
+            isLoading = loading;
+            if (loading) {
+                loadingIndicator.classList.remove('hidden');
+                gridView.classList.add('hidden');
+                albumView.classList.add('hidden');
+            } else {
+                loadingIndicator.classList.add('hidden');
+                if (currentView === 'grid') {
+                    gridView.classList.remove('hidden');
+                } else if (currentView === 'album') {
+                    albumView.classList.remove('hidden');
+                }
+            }
+        }
 
         // --- Data Rendering ---
         function renderItems(docs) {
+            setLoadingState(false);
             currentItemDocs = docs.map(doc => ({ id: doc.id, data: doc.data() }));
             itemGrid.innerHTML = '';
             itemCount = docs.length;
@@ -461,10 +497,11 @@
         }
 
         function renderTracks(docs) {
+            setLoadingState(false);
             const trackList = document.getElementById('track-list');
             trackList.innerHTML = '';
             document.getElementById('album-view-meta').textContent = `${docs.length} track${docs.length !== 1 ? 's' : ''}`;
-            document.getElementById('drop-message').classList.toggle('hidden', docs.length > 0);
+            dropMessage.classList.toggle('hidden', docs.length > 0);
             currentPlaylist = docs.map(doc => ({ docId: doc.id, fileName: doc.data().fileName, fileUrl: doc.data().fileUrl, artist: currentAlbum.data.artist, albumTitle: currentAlbum.data.title, albumArt: currentAlbum.data.imageUrl }));
             currentPlaylist.forEach((track, index) => {
                 const el = document.createElement('div');
@@ -543,8 +580,8 @@
         }
 
         // --- Firestore & Storage Logic ---
-        function listenForItems() { if (window.itemsCollectionRef) { if (itemsUnsubscribe) itemsUnsubscribe(); const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId)); itemsUnsubscribe = onSnapshot(q, s => renderItems(s.docs.sort((a, b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for items:", e)); } }
-        function listenForTracks(albumId) { if (window.itemsCollectionRef) { const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); if (tracksUnsubscribe) tracksUnsubscribe(); tracksUnsubscribe = onSnapshot(query(tracksRef), s => renderTracks(s.docs.sort((a,b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for tracks:", e)); } }
+        function listenForItems() { if (window.itemsCollectionRef) { setLoadingState(true); if (itemsUnsubscribe) itemsUnsubscribe(); const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId)); itemsUnsubscribe = onSnapshot(q, s => renderItems(s.docs.sort((a, b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => { setLoadingState(false); console.error("Error listening for items:", e); showConfirmation("Error", "Failed to load your library. Please try again later.", true); }); } }
+        function listenForTracks(albumId) { if (window.itemsCollectionRef) { setLoadingState(true); const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); if (tracksUnsubscribe) tracksUnsubscribe(); tracksUnsubscribe = onSnapshot(query(tracksRef), s => renderTracks(s.docs.sort((a,b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => { setLoadingState(false); console.error("Error listening for tracks:", e); showConfirmation("Error", "Failed to load tracks. Please try again later.", true); }); } }
         
         async function createItem(type) { 
             if (!window.itemsCollectionRef) return;
@@ -558,19 +595,24 @@
                 counter++;
                 finalName = `${name} ${counter}`;
             }
-
-            const data = { title: finalName, type, parentId: currentFolderId, createdAt: serverTimestamp() }; 
-            if (type === 'album') { 
-                data.artist = 'Untitled Artist'; 
-                data.imageUrl = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(finalName)}`; 
-            } 
-            await addDoc(itemsCollectionRef, data); 
+            try {
+                const data = { title: finalName, type, parentId: currentFolderId, createdAt: serverTimestamp() }; 
+                if (type === 'album') { 
+                    data.artist = 'Untitled Artist'; 
+                    data.imageUrl = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(finalName)}`; 
+                } 
+                await addDoc(itemsCollectionRef, data); 
+            } catch (error) {
+                console.error("Error creating item:", error);
+                showConfirmation("Error", "Failed to create item. Please check your connection and try again.", true);
+            }
         }
         
         function addTrack(albumId, file) {
             console.log('Attempting to upload track:', file.name, 'to album:', albumId);
             if (!window.itemsCollectionRef || !window.userId) {
                 console.error("Upload failed: User or database not initialized.");
+                showConfirmation("Error", "Failed to upload file. Please sign in and try again.", true);
                 return;
             }
             
@@ -597,25 +639,135 @@
                 }, 
                 () => {
                     getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
-                        const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
-                        await addDoc(tracksRef, { fileName: file.name, fileUrl: downloadURL, createdAt: serverTimestamp() });
-                        // The placeholder will be removed automatically when the listener updates the track list
+                        try {
+                            const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
+                            await addDoc(tracksRef, { fileName: file.name, fileUrl: downloadURL, createdAt: serverTimestamp() });
+                            // The placeholder will be removed automatically when the listener updates the track list
+                        } catch (error) {
+                            console.error("Error adding track to Firestore:", error);
+                            showConfirmation("Error", "Failed to save track info. Please try again.", true);
+                        }
                     });
                 }
             );
         }
 
-        async function removeTrack(albumId, trackId) { if (window.itemsCollectionRef) { await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId)); } }
-        async function updateItem(id, data) { if(window.itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data); }
-        async function deleteItem(id) { if(window.itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id)); }
+        async function removeTrack(albumId, trackId) {
+            try {
+                if (window.itemsCollectionRef) { 
+                    await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId)); 
+                }
+            } catch (error) {
+                console.error("Error removing track:", error);
+                showConfirmation("Error", "Failed to remove track. Please try again.", true);
+            }
+        }
+
+        async function updateItem(id, data) {
+            try {
+                if(window.itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data);
+            } catch (error) {
+                console.error("Error updating item:", error);
+                showConfirmation("Error", "Failed to update item. Please try again.", true);
+            }
+        }
+        
+        async function deleteItem(id) { 
+            try {
+                if(window.itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id));
+            } catch (error) {
+                console.error("Error deleting item:", error);
+                showConfirmation("Error", "Failed to delete item. Please try again.", true);
+            }
+        }
 
         // --- Album Art & Glow Logic ---
         albumArtWrapper.addEventListener('click', () => imageUpload.click());
-        imageUpload.addEventListener('change', (e) => { const file = e.target.files[0]; if (file && currentAlbum) { const reader = new FileReader(); reader.onload = (event) => { const newImageUrl = event.target.result; updateItem(currentAlbum.id, { imageUrl: newImageUrl }); document.getElementById('album-view-cover').src = newImageUrl; updateAlbumArtGlow(newImageUrl); }; reader.readAsDataURL(file); } });
-        function updateAlbumArtGlow(imageUrl) { const img = new Image(); img.crossOrigin = "Anonymous"; img.src = imageUrl; img.onload = () => { const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); const topLeft = ctx.getImageData(0, 0, 1, 1).data; const bottomRight = ctx.getImageData(img.width - 1, img.height - 1, 1, 1).data; const color1 = `rgba(${topLeft[0]}, ${topLeft[1]}, ${topLeft[2]}, 0.7)`; const color2 = `rgba(${bottomRight[0]}, ${bottomRight[1]}, ${bottomRight[2]}, 0.7)`; document.querySelector('.album-art-glow').style.background = `linear-gradient(45deg, ${color1}, ${color2})`; }; }
+        imageUpload.addEventListener('change', async (e) => { 
+            const file = e.target.files[0]; 
+            if (file && currentAlbum) { 
+                const reader = new FileReader(); 
+                reader.onload = async (event) => { 
+                    const newImageUrl = event.target.result; 
+                    await updateItem(currentAlbum.id, { imageUrl: newImageUrl }); 
+                    document.getElementById('album-view-cover').src = newImageUrl; 
+                    updateAlbumArtGlow(newImageUrl); 
+                }; 
+                reader.readAsDataURL(file); 
+            } 
+        });
+
+        function updateAlbumArtGlow(imageUrl) { 
+            const img = new Image(); 
+            img.crossOrigin = "Anonymous"; 
+            img.src = imageUrl; 
+            img.onload = () => { 
+                const canvas = document.createElement('canvas'); 
+                canvas.width = img.width; 
+                canvas.height = img.height; 
+                const ctx = canvas.getContext('2d'); 
+                ctx.drawImage(img, 0, 0); 
+                const topLeft = ctx.getImageData(0, 0, 1, 1).data; 
+                const bottomRight = ctx.getImageData(img.width - 1, img.height - 1, 1, 1).data; 
+                const color1 = `rgba(${topLeft[0]}, ${topLeft[1]}, ${topLeft[2]}, 0.7)`; 
+                const color2 = `rgba(${bottomRight[0]}, ${bottomRight[1]}, ${bottomRight[2]}, 0.7)`; 
+                document.querySelector('.album-art-glow').style.background = `linear-gradient(45deg, ${color1}, ${color2})`; 
+            }; 
+        }
 
         // --- Gemini API Logic ---
-        async function generateCoverArt() { const title = document.getElementById('edit-title').value; const artist = document.getElementById('edit-artist').value; if (!title || !artist) { showConfirmation("Missing Info", "Please enter a title and artist first.", true); return; } const spinner = document.getElementById('suggest-art-spinner'); const btnText = document.getElementById('suggest-art-text'); spinner.classList.remove('hidden'); btnText.classList.add('hidden'); suggestArtBtn.disabled = true; const prompt = `Album cover for a project titled '${title}' by the artist '${artist}'. Style: vibrant, abstract, digital art.`; const payload = { instances: [{ prompt }], parameters: { "sampleCount": 1 } }; const apiKey = ""; const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`; try { let response; let retries = 0; let delay = 1000; while (retries < 5) { response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); if (response.ok) break; if (response.status === 429 || response.status >= 500) { retries++; await new Promise(resolve => setTimeout(resolve, delay)); delay *= 2; } else { throw new Error(`API Error: ${response.statusText}`); } } if (!response || !response.ok) { throw new Error('Failed to generate image after several retries.'); } const result = await response.json(); if (result.predictions && result.predictions[0]?.bytesBase64Encoded) { const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`; document.getElementById('edit-image-url').value = imageUrl; } else { throw new Error("No image data in API response."); } } catch (error) { console.error("Error generating cover art:", error); showConfirmation("Generation Failed", "Sorry, couldn't generate cover art. Please try again.", true); } finally { spinner.classList.add('hidden'); btnText.classList.remove('hidden'); suggestArtBtn.disabled = false; } }
+        async function generateCoverArt() { 
+            const title = document.getElementById('edit-title').value; 
+            const artist = document.getElementById('edit-artist').value; 
+            if (!title || !artist) { 
+                showConfirmation("Missing Info", "Please enter a title and artist first.", true); 
+                return; 
+            } 
+            const spinner = document.getElementById('suggest-art-spinner'); 
+            const btnText = document.getElementById('suggest-art-text'); 
+            spinner.classList.remove('hidden'); 
+            btnText.classList.add('hidden'); 
+            suggestArtBtn.disabled = true; 
+            
+            const prompt = `Album cover for a project titled '${title}' by the artist '${artist}'. Style: vibrant, abstract, digital art.`; 
+            const payload = { instances: [{ prompt }], parameters: { "sampleCount": 1 } }; 
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`; 
+            
+            try { 
+                let response; 
+                let retries = 0; 
+                let delay = 1000; 
+                while (retries < 5) { 
+                    response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); 
+                    if (response.ok) break; 
+                    if (response.status === 429 || response.status >= 500) { 
+                        retries++; 
+                        await new Promise(resolve => setTimeout(resolve, delay)); 
+                        delay *= 2; 
+                    } else { 
+                        throw new Error(`API Error: ${response.statusText}`); 
+                    } 
+                } 
+                if (!response || !response.ok) { 
+                    throw new Error('Failed to generate image after several retries.'); 
+                } 
+                const result = await response.json(); 
+                if (result.predictions && result.predictions[0]?.bytesBase64Encoded) { 
+                    const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`; 
+                    document.getElementById('edit-image-url').value = imageUrl; 
+                } else { 
+                    throw new Error("No image data in API response."); 
+                } 
+            } catch (error) { 
+                console.error("Error generating cover art:", error); 
+                showConfirmation("Generation Failed", "Sorry, couldn't generate cover art. Please try again.", true); 
+            } finally { 
+                spinner.classList.add('hidden'); 
+                btnText.classList.remove('hidden'); 
+                suggestArtBtn.disabled = false; 
+            } 
+        }
 
         // --- UI (Menus & Modals) ---
         function showContextMenu(menu, x, y) { hideAllContextMenus(); if(menu === contextMenuItem) { document.getElementById('edit-btn').disabled = contextTarget.data.type === 'folder'; } const menuWidth = menu.offsetWidth, menuHeight = menu.offsetHeight, screenWidth = window.innerWidth, screenHeight = window.innerHeight; menu.style.left = `${Math.min(x, screenWidth - menuWidth - 10)}px`; menu.style.top = `${Math.min(y, screenHeight - menuHeight - 10)}px`; menu.classList.remove('hidden'); setTimeout(() => menu.classList.remove('opacity-0', 'scale-95'), 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
@@ -722,7 +874,7 @@
         document.getElementById('track-remove-btn').addEventListener('click', e => { e.preventDefault(); if (trackContextTarget) { removeTrack(currentAlbum.id, trackContextTarget.id); } hideAllContextMenus(); });
         suggestArtBtn.addEventListener('click', generateCoverArt);
         
-        document.getElementById('rename-form').addEventListener('submit', e => { 
+        document.getElementById('rename-form').addEventListener('submit', async e => { 
             e.preventDefault(); 
             const newTitle = document.getElementById('rename-input').value.trim();
             if (!newTitle) return;
@@ -736,11 +888,11 @@
                 return;
             }
 
-            if (newTitle) updateItem(contextTarget.id, { title: newTitle }); 
+            if (newTitle) await updateItem(contextTarget.id, { title: newTitle }); 
             hideModal(renameModal); 
         });
 
-        document.getElementById('edit-form').addEventListener('submit', e => { e.preventDefault(); const newData = { title: document.getElementById('edit-title').value, artist: document.getElementById('edit-artist').value, imageUrl: document.getElementById('edit-image-url').value }; if (newData.title && newData.artist && newData.imageUrl) updateItem(contextTarget.id, newData); hideModal(editModal); });
+        document.getElementById('edit-form').addEventListener('submit', async e => { e.preventDefault(); const newData = { title: document.getElementById('edit-title').value, artist: document.getElementById('edit-artist').value, imageUrl: document.getElementById('edit-image-url').value }; if (newData.title && newData.artist && newData.imageUrl) await updateItem(contextTarget.id, newData); hideModal(editModal); });
         document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => { hideModal(renameModal); hideModal(editModal); }));
         document.getElementById('confirm-cancel-btn').addEventListener('click', () => hideModal(confirmModal));
         document.getElementById('settings-close-btn').addEventListener('click', () => hideModal(settingsModal));
