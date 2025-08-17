@@ -220,6 +220,39 @@
             </div>
         </div>
     </div>
+    <!-- NEW Settings Modal -->
+    <div id="settings-modal" class="modal fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50 opacity-0 transition-opacity">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md transform scale-95 transition-transform">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-white">Settings</h2>
+                <button id="settings-close-btn" class="p-2 rounded-full hover:bg-gray-700">&times;</button>
+            </div>
+            
+            <div class="flex items-center space-x-4 mb-6">
+                <img id="settings-pfp" src="" class="w-16 h-16 rounded-full">
+                <div>
+                    <h3 id="settings-username" class="text-xl font-bold text-white"></h3>
+                    <p class="text-gray-400">User Profile</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <h4 class="text-lg font-semibold text-white border-b border-gray-700 pb-2">Connections</h4>
+                <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                    <span class="font-semibold">Google Drive</span>
+                    <button id="connect-drive-btn" class="py-1 px-3 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg">Connect</button>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                    <span class="font-semibold">Discord</span>
+                    <button id="connect-discord-btn" class="py-1 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg">Connect</button>
+                </div>
+            </div>
+
+            <div class="mt-8 flex justify-end">
+                <button id="sign-out-btn" class="py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg">Sign Out</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -247,7 +280,7 @@
         const itemGrid = document.getElementById('item-grid');
         const headerTitle = document.getElementById('header-title'), backButton = document.getElementById('back-button');
         const contextMenuBg = document.getElementById('context-menu-bg'), contextMenuItem = document.getElementById('context-menu-item'), contextMenuTrack = document.getElementById('context-menu-track');
-        const renameModal = document.getElementById('rename-modal'), editModal = document.getElementById('edit-modal'), confirmModal = document.getElementById('confirm-modal');
+        const renameModal = document.getElementById('rename-modal'), editModal = document.getElementById('edit-modal'), confirmModal = document.getElementById('confirm-modal'), settingsModal = document.getElementById('settings-modal');
         const dropZone = document.getElementById('drop-zone');
         const audioUpload = document.getElementById('audio-upload');
         const suggestArtBtn = document.getElementById('suggest-art-btn');
@@ -325,10 +358,15 @@
         function updateUserProfile(user) {
             if (user) {
                 userProfileDiv.innerHTML = `
-                    <img src="${user.photoURL}" alt="User Avatar" class="w-8 h-8 rounded-full">
-                    <button id="sign-out-btn" class="py-2 px-4 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg">Sign Out</button>
+                    <img id="user-pfp-btn" src="${user.photoURL}" alt="User Avatar" class="w-10 h-10 rounded-full cursor-pointer hover:opacity-80">
                 `;
+                document.getElementById('user-pfp-btn').addEventListener('click', () => {
+                    document.getElementById('settings-pfp').src = user.photoURL;
+                    document.getElementById('settings-username').textContent = user.displayName;
+                    showModal(settingsModal);
+                });
                 document.getElementById('sign-out-btn').addEventListener('click', signOutUser);
+
             } else {
                 userProfileDiv.innerHTML = `
                     <button id="sign-in-btn" class="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg">Sign In with Google</button>
@@ -581,10 +619,10 @@
 
         // --- UI (Menus & Modals) ---
         function showContextMenu(menu, x, y) { hideAllContextMenus(); if(menu === contextMenuItem) { document.getElementById('edit-btn').disabled = contextTarget.data.type === 'folder'; } const menuWidth = menu.offsetWidth, menuHeight = menu.offsetHeight, screenWidth = window.innerWidth, screenHeight = window.innerHeight; menu.style.left = `${Math.min(x, screenWidth - menuWidth - 10)}px`; menu.style.top = `${Math.min(y, screenHeight - menuHeight - 10)}px`; menu.classList.remove('hidden'); setTimeout(() => menu.classList.remove('opacity-0', 'scale-95'), 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
-        function handleOutsideClick(event) { const isClickInsideMenu = contextMenuBg.contains(event.target) || contextMenuItem.contains(event.target) || contextMenuTrack.contains(event.target); if (!isClickInsideMenu) { hideAllContextMenus(); } else { document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); } }
+        function handleOutsideClick(event) { const isClickInsideMenu = contextMenuBg.contains(event.target) || contextMenuItem.contains(event.target) || contextMenuTrack.contains(event.target) || settingsModal.contains(event.target); if (!isClickInsideMenu) { hideAllContextMenus(); hideModal(settingsModal); } else { document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); } }
         function hideAllContextMenus() { document.removeEventListener('mousedown', handleOutsideClick, { capture: true }); [contextMenuBg, contextMenuItem, contextMenuTrack].forEach(m => { if (!m.classList.contains('hidden')) { m.classList.add('opacity-0', 'scale-95'); setTimeout(() => m.classList.add('hidden'), 200); } }); }
-        function showModal(modal) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); }
-        function hideModal(modal) { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); }
+        function showModal(modal) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
+        function hideModal(modal) { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); document.removeEventListener('mousedown', handleOutsideClick, { capture: true });}
         function showConfirmation(title, message, isAlert = false) { return new Promise((resolve) => { const confirmTitle = document.getElementById('confirm-title'), confirmMessage = document.getElementById('confirm-message'), okBtn = document.getElementById('confirm-ok-btn'), cancelBtn = document.getElementById('confirm-cancel-btn'); confirmTitle.textContent = title; confirmMessage.textContent = message; if(isAlert) { okBtn.textContent = 'OK'; okBtn.className = 'py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors'; cancelBtn.classList.add('hidden'); } else { okBtn.textContent = 'Delete'; okBtn.className = 'py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors'; cancelBtn.classList.remove('hidden'); } showModal(confirmModal); const okHandler = () => { hideModal(confirmModal); resolve(true); cleanup(); }; const cancelHandler = () => { hideModal(confirmModal); resolve(false); cleanup(); }; function cleanup() { okBtn.removeEventListener('click', okHandler); cancelBtn.removeEventListener('click', cancelHandler); } okBtn.addEventListener('click', okHandler, { once: true }); cancelBtn.addEventListener('click', cancelHandler, { once: true }); }); }
 
         // --- State Persistence ---
@@ -705,6 +743,9 @@
         document.getElementById('edit-form').addEventListener('submit', e => { e.preventDefault(); const newData = { title: document.getElementById('edit-title').value, artist: document.getElementById('edit-artist').value, imageUrl: document.getElementById('edit-image-url').value }; if (newData.title && newData.artist && newData.imageUrl) updateItem(contextTarget.id, newData); hideModal(editModal); });
         document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => { hideModal(renameModal); hideModal(editModal); }));
         document.getElementById('confirm-cancel-btn').addEventListener('click', () => hideModal(confirmModal));
+        document.getElementById('settings-close-btn').addEventListener('click', () => hideModal(settingsModal));
+        document.getElementById('connect-drive-btn').addEventListener('click', () => console.log('Connect to Google Drive clicked'));
+        document.getElementById('connect-discord-btn').addEventListener('click', () => console.log('Connect to Discord clicked'));
 
         // --- Initialize ---
         function initializeAppState() {
