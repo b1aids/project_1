@@ -270,16 +270,13 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
         // --- State Management ---
         let currentView = 'grid', currentFolderId = 'root', currentAlbum = null;
         let contextTarget = null, trackContextTarget = null;
         let itemCount = 0;
-        let tracksUnsubscribe = null, itemsUnsubscribe = null;
+        let channels = {};
         let currentItemDocs = []; // To store current items for duplicate checks
         let isLoading = false;
         
@@ -319,75 +316,64 @@
         const dropMessage = document.getElementById('drop-message');
         const logoButton = document.getElementById('logo-button');
         
-        // --- Firebase Setup ---
-        let db, auth, storage, userId, itemsCollectionRef;
+        // --- Supabase Setup ---
+        const supabaseUrl = 'https://ajgbywixgkvmftcvuuzg.supabase.co'; // Replace with your Supabase URL
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqZ2J5d2l4Z2t2bWZ0Y3Z1dXpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjA3OTY4NDUsImV4cCI6MjAzNjM3Mjg0NX0.91VpL-Vq-O8m3a6pW6s6nLd92iU0b-u9r51t4i6e6-U'; // Replace with your Supabase anonymous key
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        let userId;
 
-        async function initializeFirebase() {
-            try {
-                // Using the specific Firebase config provided by the user
-                const firebaseConfig = {
-                    apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc",
-                    authDomain: "project-1-f9e5b.firebaseapp.com",
-                    projectId: "project-1-f9e5b",
-                    storageBucket: "project-1-f9e5b.appspot.com",
-                    messagingSenderId: "272340259942",
-                    appId: "1:272340259942:web:a5a5a302342e0b4eb389a7",
-                    measurementId: "G-EKL8BPFSG1"
-                };
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                storage = getStorage(app);
+        async function getSession() {
+            const { data, error } = await supabase.auth.getSession();
+            if (error) {
+                console.error("Error getting session:", error);
+                return null;
+            }
+            return data.session;
+        }
 
-                // Reverting to the original sign-in method from the first message
-                onAuthStateChanged(auth, user => {
-                    if (user) {
-                        userId = user.uid;
-                        // Using the original Firestore path from the user's first message
-                        itemsCollectionRef = collection(db, `users/${userId}/items`);
-                        updateUserProfile(user);
-                        initializeAppState();
-                    } else {
-                        // Handle signed-out state
-                        if (itemsUnsubscribe) itemsUnsubscribe();
-                        if (tracksUnsubscribe) tracksUnsubscribe();
-                        itemGrid.innerHTML = '<div class="col-span-full text-center text-gray-500 mt-10">Please sign in to view your library.</div>';
-                        albumView.classList.add('hidden');
-                        gridView.classList.remove('hidden');
-                        updateUserProfile(null);
-                    }
-                });
-            } catch (error) {
-                console.error("Firebase initialization error:", error);
-                document.body.innerHTML = `<div class="flex items-center justify-center h-screen text-center p-4"><div class="bg-red-900 border border-red-500 text-white p-6 rounded-lg"><h2 class="text-2xl font-bold mb-2">Error: Firebase Configuration Missing</h2><p>The app cannot run without a valid Firebase configuration. Please check the console for details.</p></div></div>`;
+        async function handleAuthChange(event, session) {
+            if (session) {
+                userId = session.user.id;
+                updateUserProfile(session.user);
+                initializeAppState();
+            } else {
+                if (channels.items) { channels.items.unsubscribe(); delete channels.items; }
+                if (channels.tracks) { channels.tracks.unsubscribe(); delete channels.tracks; }
+                itemGrid.innerHTML = '<div class="col-span-full text-center text-gray-500 mt-10">Please sign in to view your library.</div>';
+                albumView.classList.add('hidden');
+                gridView.classList.remove('hidden');
+                updateUserProfile(null);
+            }
+        }
+        
+        // --- Authentication ---
+        async function signIn() {
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+            });
+            if (error) {
+                console.error("Sign in error:", error);
+                showConfirmation("Sign In Failed", `Error: ${error.message}`, true);
             }
         }
 
-        // --- Authentication ---
-        const provider = new GoogleAuthProvider();
-
-        function signIn() {
-            signInWithPopup(auth, provider).catch(error => {
-                console.error("Sign in error:", error);
-                showConfirmation("Sign In Failed", `Error: ${error.message}`, true);
-            });
-        }
-
-        function signOutUser() {
-            signOut(auth).catch(error => {
+        async function signOutUser() {
+            const { error } = await supabase.auth.signOut();
+            if (error) {
                 console.error("Sign out error:", error);
                 showConfirmation("Sign Out Failed", `Error: ${error.message}`, true);
-            });
+            }
         }
 
         function updateUserProfile(user) {
             if (user) {
                 userProfileDiv.innerHTML = `
-                    <img id="user-pfp-btn" src="${user.photoURL || 'https://placehold.co/40x40/5865F2/FFFFFF?text=U'}" alt="User Avatar" class="w-10 h-10 rounded-full cursor-pointer hover:opacity-80">
+                    <img id="user-pfp-btn" src="${user.user_metadata.avatar_url || 'https://placehold.co/40x40/5865F2/FFFFFF?text=U'}" alt="User Avatar" class="w-10 h-10 rounded-full cursor-pointer hover:opacity-80">
                 `;
                 document.getElementById('user-pfp-btn').addEventListener('click', () => {
-                    document.getElementById('settings-pfp').src = user.photoURL || 'https://placehold.co/64x64/5865F2/FFFFFF?text=U';
-                    document.getElementById('settings-username').textContent = user.displayName || 'Anonymous User';
+                    document.getElementById('settings-pfp').src = user.user_metadata.avatar_url || 'https://placehold.co/64x64/5865F2/FFFFFF?text=U';
+                    document.getElementById('settings-username').textContent = user.user_metadata.full_name || 'Anonymous User';
                     showModal(settingsModal);
                 });
                 document.getElementById('sign-out-btn').addEventListener('click', signOutUser);
@@ -414,7 +400,8 @@
         }
 
         async function handleHashChange() {
-            if (!auth.currentUser) return; // Don't navigate if not signed in
+            const session = await getSession();
+            if (!session) return;
             const hash = location.hash.substring(1);
             const [type, id] = hash.split('/');
 
@@ -423,16 +410,15 @@
                 updateView('grid');
             } else if (type === 'album' && id) {
                 try {
-                    const albumDocRef = doc(db, itemsCollectionRef.path, id);
-                    const albumDoc = await getDoc(albumDocRef);
-                    if (albumDoc.exists()) {
-                        currentAlbum = { id: albumDoc.id, data: albumDoc.data() };
-                        currentFolderId = currentAlbum.data.parentId;
-                        updateView('album');
-                    } else {
-                        console.error("Album not found, redirecting to root.");
+                    const { data, error } = await supabase.from('items').select('*').eq('id', id).single();
+                    if (error || !data) {
+                        console.error("Album not found:", error);
                         location.hash = 'folder/root';
+                        return;
                     }
+                    currentAlbum = { id: data.id, data: data };
+                    currentFolderId = currentAlbum.data.parent_id;
+                    updateView('album');
                 } catch (error) {
                     console.error("Error fetching album:", error);
                     showConfirmation("Error", "Failed to load album details. Please try again later.", true);
@@ -445,8 +431,8 @@
 
         function updateView(view) {
             currentView = view;
-            if (itemsUnsubscribe) { itemsUnsubscribe(); itemsUnsubscribe = null; }
-            if (tracksUnsubscribe) { tracksUnsubscribe(); tracksUnsubscribe = null; }
+            if (channels.items) { channels.items.unsubscribe(); delete channels.items; }
+            if (channels.tracks) { channels.tracks.unsubscribe(); delete channels.tracks; }
             
             backButton.style.display = (currentFolderId !== 'root' || view === 'album') ? 'flex' : 'none';
             setLoadingState(true);
@@ -461,8 +447,8 @@
                 gridView.classList.add('hidden');
                 albumView.classList.remove('hidden');
                 const coverImg = document.getElementById('album-view-cover');
-                coverImg.src = currentAlbum.data.imageUrl;
-                coverImg.onload = () => updateAlbumArtGlow(currentAlbum.data.imageUrl);
+                coverImg.src = currentAlbum.data.image_url;
+                coverImg.onload = () => updateAlbumArtGlow(currentAlbum.data.image_url);
                 document.getElementById('album-view-title').textContent = currentAlbum.data.title;
                 document.getElementById('album-view-artist').textContent = currentAlbum.data.artist;
                 listenForTracks(currentAlbum.id);
@@ -486,36 +472,36 @@
         }
 
         // --- Data Rendering ---
-        function renderItems(docs) {
+        function renderItems(items) {
             setLoadingState(false);
-            currentItemDocs = docs.map(doc => ({ id: doc.id, data: doc.data() }));
+            currentItemDocs = items;
             itemGrid.innerHTML = '';
-            itemCount = docs.length;
-            if (docs.length === 0) { itemGrid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10">Right-click to add your first album or folder.</div>`; }
+            itemCount = items.length;
+            if (items.length === 0) { itemGrid.innerHTML = `<div class="col-span-full text-center text-gray-500 mt-10">Right-click to add your first album or folder.</div>`; }
             
             if (currentFolderId !== 'root') {
-                 getDoc(doc(db, itemsCollectionRef.path, currentFolderId)).then(docSnap => {
-                     if(docSnap.exists()) headerTitle.textContent = docSnap.data().title;
+                 supabase.from('items').select('title').eq('id', currentFolderId).single().then(({data}) => {
+                     if(data) headerTitle.textContent = data.title;
                  });
             }
 
-            currentItemDocs.forEach(item => {
+            items.forEach(item => {
                 const el = document.createElement('div');
                 el.className = 'w-full space-y-2 cursor-pointer group item-fade-in';
-                el.innerHTML = item.data.type === 'album' ? `<div class="relative aspect-square"><img src="${item.data.imageUrl}" class="w-full h-full object-cover rounded-lg shadow-lg group-hover:scale-105 transition-transform" onerror="this.src='https://placehold.co/200x200/333/fff?text=Error';"></div><div class="text-white"><h3 class="font-bold truncate">${item.data.title}</h3><p class="text-sm text-gray-400 truncate">${item.data.artist}</p></div>` : `<div class="relative aspect-square w-full h-full rounded-lg shadow-lg bg-gray-800 flex items-center justify-center group-hover:scale-105 transition-transform"><svg class="h-1/2 w-1/2 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg></div><div class="text-white"><h3 class="font-bold truncate">${item.data.title}</h3><p class="text-sm text-gray-400">Folder</p></div>`;
-                el.addEventListener('click', () => item.data.type === 'folder' ? navigateTo(item.id) : showAlbumView(item));
+                el.innerHTML = item.type === 'album' ? `<div class="relative aspect-square"><img src="${item.image_url}" class="w-full h-full object-cover rounded-lg shadow-lg group-hover:scale-105 transition-transform" onerror="this.src='https://placehold.co/200x200/333/fff?text=Error';"></div><div class="text-white"><h3 class="font-bold truncate">${item.title}</h3><p class="text-sm text-gray-400 truncate">${item.artist}</p></div>` : `<div class="relative aspect-square w-full h-full rounded-lg shadow-lg bg-gray-800 flex items-center justify-center group-hover:scale-105 transition-transform"><svg class="h-1/2 w-1/2 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg></div><div class="text-white"><h3 class="font-bold truncate">${item.title}</h3><p class="text-sm text-gray-400">Folder</p></div>`;
+                el.addEventListener('click', () => item.type === 'folder' ? navigateTo(item.id) : showAlbumView({ id: item.id, data: item }));
                 el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); contextTarget = item; showContextMenu(contextMenuItem, e.clientX, e.clientY); });
                 itemGrid.appendChild(el);
             });
         }
 
-        function renderTracks(docs) {
+        function renderTracks(tracks) {
             setLoadingState(false);
             const trackList = document.getElementById('track-list');
             trackList.innerHTML = '';
-            document.getElementById('album-view-meta').textContent = `${docs.length} track${docs.length !== 1 ? 's' : ''}`;
-            dropMessage.classList.toggle('hidden', docs.length > 0);
-            currentPlaylist = docs.map(doc => ({ docId: doc.id, fileName: doc.data().fileName, fileUrl: doc.data().fileUrl, artist: currentAlbum.data.artist, albumTitle: currentAlbum.data.title, albumArt: currentAlbum.data.imageUrl }));
+            document.getElementById('album-view-meta').textContent = `${tracks.length} track${tracks.length !== 1 ? 's' : ''}`;
+            dropMessage.classList.toggle('hidden', tracks.length > 0);
+            currentPlaylist = tracks.map(track => ({ docId: track.id, fileName: track.file_name, fileUrl: track.file_url, artist: currentAlbum.data.artist, albumTitle: currentAlbum.data.title, albumArt: currentAlbum.data.image_url }));
             currentPlaylist.forEach((track, index) => {
                 const el = document.createElement('div');
                 el.className = 'track-item flex items-center p-2 rounded-md hover:bg-gray-700 text-gray-400 transition-colors cursor-pointer relative';
@@ -592,39 +578,80 @@
             return `${minutes}:${secs < 10 ? '0' : ''}${secs}`; 
         }
 
-        // --- Firestore & Storage Logic ---
-        function listenForItems() { if (itemsCollectionRef) { setLoadingState(true); if (itemsUnsubscribe) itemsUnsubscribe(); const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId)); itemsUnsubscribe = onSnapshot(q, s => renderItems(s.docs.sort((a, b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => { setLoadingState(false); console.error("Error listening for items:", e); showConfirmation("Error", "Failed to load your library. Please try again later.", true); }); } }
-        function listenForTracks(albumId) { if (itemsCollectionRef) { setLoadingState(true); const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); if (tracksUnsubscribe) tracksUnsubscribe(); tracksUnsubscribe = onSnapshot(query(tracksRef), s => renderTracks(s.docs.sort((a,b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => { setLoadingState(false); console.error("Error listening for tracks:", e); showConfirmation("Error", "Failed to load tracks. Please try again later.", true); }); } }
+        // --- Supabase CRUD & Storage Logic ---
+        function listenForItems() { 
+            setLoadingState(true); 
+            channels.items = supabase.channel('items_db_changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter: `parent_id=eq.${currentFolderId}` }, payload => {
+                    const { eventType, new: newItem, old: oldItem } = payload;
+                    if (eventType === 'INSERT') {
+                        currentItemDocs.push(newItem);
+                    } else if (eventType === 'UPDATE') {
+                        currentItemDocs = currentItemDocs.map(item => item.id === newItem.id ? newItem : item);
+                    } else if (eventType === 'DELETE') {
+                        currentItemDocs = currentItemDocs.filter(item => item.id !== oldItem.id);
+                    }
+                    renderItems(currentItemDocs);
+                })
+                .subscribe();
+
+            supabase.from('items').select('*').eq('parent_id', currentFolderId).order('created_at').then(({data, error}) => {
+                if(error) { console.error("Error fetching items:", error); setLoadingState(false); return; }
+                renderItems(data);
+            });
+        }
+        
+        function listenForTracks(albumId) {
+            setLoadingState(true);
+            channels.tracks = supabase.channel('tracks_db_changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'tracks', filter: `album_id=eq.${albumId}` }, payload => {
+                    const { eventType, new: newTrack, old: oldTrack } = payload;
+                    if (eventType === 'INSERT') {
+                        currentPlaylist.push(newTrack);
+                    } else if (eventType === 'UPDATE') {
+                        currentPlaylist = currentPlaylist.map(track => track.id === newTrack.id ? newTrack : track);
+                    } else if (eventType === 'DELETE') {
+                        currentPlaylist = currentPlaylist.filter(track => track.id !== oldTrack.id);
+                    }
+                    renderTracks(currentPlaylist);
+                })
+                .subscribe();
+            
+            supabase.from('tracks').select('*').eq('album_id', albumId).order('created_at').then(({data, error}) => {
+                if(error) { console.error("Error fetching tracks:", error); setLoadingState(false); return; }
+                renderTracks(data);
+            });
+        }
         
         async function createItem(type) { 
-            if (!itemsCollectionRef) return;
+            if (!userId) return;
             
             let name = `New ${type}`;
             let counter = 1;
             let finalName = `${name} ${counter}`;
-            const existingTitles = currentItemDocs.map(item => item.data.title.toLowerCase());
+            const existingTitles = currentItemDocs.map(item => item.title.toLowerCase());
 
             while (existingTitles.includes(finalName.toLowerCase())) {
                 counter++;
                 finalName = `${name} ${counter}`;
             }
             try {
-                const data = { title: finalName, type, parentId: currentFolderId, createdAt: serverTimestamp() }; 
+                const data = { user_id: userId, title: finalName, type: type, parent_id: currentFolderId }; 
                 if (type === 'album') { 
                     data.artist = 'Untitled Artist'; 
-                    data.imageUrl = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(finalName)}`; 
+                    data.image_url = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(finalName)}`; 
                 } 
-                await addDoc(itemsCollectionRef, data); 
+                const { error } = await supabase.from('items').insert([data]);
+                if (error) throw error;
             } catch (error) {
                 console.error("Error creating item:", error);
                 showConfirmation("Error", "Failed to create item. Please check your connection and try again.", true);
             }
         }
         
-        function addTrack(albumId, file) {
-            console.log('Attempting to upload track:', file.name, 'to album:', albumId);
-            if (!itemsCollectionRef || !userId) {
-                console.error("Upload failed: User or database not initialized.");
+        async function addTrack(albumId, file) {
+            if (!userId) {
+                console.error("Upload failed: User not initialized.");
                 showConfirmation("Error", "Failed to upload file. Please sign in and try again.", true);
                 return;
             }
@@ -636,41 +663,40 @@
             trackList.appendChild(placeholderEl);
             const progressSpan = placeholderEl.querySelector('.upload-progress');
 
-            // Using the original storage path from the user's first message
-            const storageRef = ref(storage, `users/${userId}/tracks/${Date.now()}_${file.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, file);
+            const filePath = `${userId}/${albumId}/${Date.now()}_${file.name}`;
+            const { data, error } = await supabase.storage.from('tracks').upload(filePath, file);
 
-            uploadTask.on('state_changed', 
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    progressSpan.textContent = `(${Math.round(progress)}%)`;
-                }, 
-                (error) => {
-                    console.error("Firebase Storage upload failed. Code:", error.code, "Message:", error.message);
-                    console.error(error); // Log the full error object
-                    placeholderEl.remove();
-                    showConfirmation("Upload Failed", `Could not upload ${file.name}. Error: ${error.code}. Please check your connection and Firebase Storage rules.`, true);
-                }, 
-                () => {
-                    getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
-                        try {
-                            const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`);
-                            await addDoc(tracksRef, { fileName: file.name, fileUrl: downloadURL, createdAt: serverTimestamp() });
-                            // The placeholder will be removed automatically when the listener updates the track list
-                        } catch (error) {
-                            console.error("Error adding track to Firestore:", error);
-                            showConfirmation("Error", "Failed to save track info. Please try again.", true);
-                        }
-                    });
-                }
-            );
+            if (error) {
+                console.error("Supabase Storage upload failed:", error);
+                placeholderEl.remove();
+                showConfirmation("Upload Failed", `Could not upload ${file.name}. Error: ${error.message}. Please check your Supabase Storage rules.`, true);
+                return;
+            }
+            
+            const { data: publicUrlData } = supabase.storage.from('tracks').getPublicUrl(filePath);
+            
+            try {
+                const { error: dbError } = await supabase.from('tracks').insert([
+                    { album_id: albumId, file_name: file.name, file_url: publicUrlData.publicUrl }
+                ]);
+                if (dbError) throw dbError;
+            } catch (error) {
+                console.error("Error adding track to Supabase:", error);
+                showConfirmation("Error", "Failed to save track info. Please try again.", true);
+            }
         }
 
         async function removeTrack(albumId, trackId) {
             try {
-                if (itemsCollectionRef) { 
-                    await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId)); 
-                }
+                const { data: trackData, error: trackError } = await supabase.from('tracks').select('file_url').eq('id', trackId).single();
+                if (trackError) throw trackError;
+                
+                const filePath = trackData.file_url.split('/tracks/')[1];
+                const { error: storageError } = await supabase.storage.from('tracks').remove([filePath]);
+                if (storageError) throw storageError;
+
+                const { error: dbError } = await supabase.from('tracks').delete().eq('id', trackId);
+                if (dbError) throw dbError;
             } catch (error) {
                 console.error("Error removing track:", error);
                 showConfirmation("Error", "Failed to remove track. Please try again.", true);
@@ -679,7 +705,8 @@
 
         async function updateItem(id, data) {
             try {
-                if(itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data);
+                const { error } = await supabase.from('items').update(data).eq('id', id);
+                if (error) throw error;
             } catch (error) {
                 console.error("Error updating item:", error);
                 showConfirmation("Error", "Failed to update item. Please try again.", true);
@@ -688,7 +715,8 @@
         
         async function deleteItem(id) { 
             try {
-                if(itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id));
+                const { error } = await supabase.from('items').delete().eq('id', id);
+                if (error) throw error;
             } catch (error) {
                 console.error("Error deleting item:", error);
                 showConfirmation("Error", "Failed to delete item. Please try again.", true);
@@ -703,7 +731,7 @@
                 const reader = new FileReader(); 
                 reader.onload = async (event) => { 
                     const newImageUrl = event.target.result; 
-                    await updateItem(currentAlbum.id, { imageUrl: newImageUrl }); 
+                    await updateItem(currentAlbum.id, { image_url: newImageUrl }); 
                     document.getElementById('album-view-cover').src = newImageUrl; 
                     updateAlbumArtGlow(newImageUrl); 
                 }; 
@@ -784,7 +812,7 @@
         }
 
         // --- UI (Menus & Modals) ---
-        function showContextMenu(menu, x, y) { hideAllContextMenus(); if(menu === contextMenuItem) { document.getElementById('edit-btn').disabled = contextTarget.data.type === 'folder'; } const menuWidth = menu.offsetWidth, menuHeight = menu.offsetHeight, screenWidth = window.innerWidth, screenHeight = window.innerHeight; menu.style.left = `${Math.min(x, screenWidth - menuWidth - 10)}px`; menu.style.top = `${Math.min(y, screenHeight - menuHeight - 10)}px`; menu.classList.remove('hidden'); setTimeout(() => menu.classList.remove('opacity-0', 'scale-95'), 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
+        function showContextMenu(menu, x, y) { hideAllContextMenus(); if(menu === contextMenuItem) { document.getElementById('edit-btn').disabled = contextTarget.type === 'folder'; } const menuWidth = menu.offsetWidth, menuHeight = menu.offsetHeight, screenWidth = window.innerWidth, screenHeight = window.innerHeight; menu.style.left = `${Math.min(x, screenWidth - menuWidth - 10)}px`; menu.style.top = `${Math.min(y, screenHeight - menuHeight - 10)}px`; menu.classList.remove('hidden'); setTimeout(() => menu.classList.remove('opacity-0', 'scale-95'), 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
         function handleOutsideClick(event) { const isClickInsideMenu = contextMenuBg.contains(event.target) || contextMenuItem.contains(event.target) || contextMenuTrack.contains(event.target) || settingsModal.contains(event.target); if (!isClickInsideMenu) { hideAllContextMenus(); hideModal(settingsModal); } else { document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); } }
         function hideAllContextMenus() { document.removeEventListener('mousedown', handleOutsideClick, { capture: true }); [contextMenuBg, contextMenuItem, contextMenuTrack].forEach(m => { if (!m.classList.contains('hidden')) { m.classList.add('opacity-0', 'scale-95'); setTimeout(() => m.classList.add('hidden'), 200); } }); }
         function showModal(modal) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); document.addEventListener('mousedown', handleOutsideClick, { once: true, capture: true }); }
@@ -793,7 +821,7 @@
 
         // --- State Persistence ---
         function saveState() {
-            if (!auth.currentUser) return;
+            if (!userId) return;
             const state = {
                 player: currentTrackIndex > -1 ? {
                     playlist: currentPlaylist,
@@ -801,14 +829,14 @@
                     currentTime: audio.currentTime
                 } : null
             };
-            localStorage.setItem(`project1_state_${auth.currentUser.uid}`, JSON.stringify(state));
+            localStorage.setItem(`project1_state_${userId}`, JSON.stringify(state));
         }
 
         // --- Event Listeners ---
         window.addEventListener('hashchange', handleHashChange);
         window.addEventListener('beforeunload', saveState);
 
-        document.getElementById('grid-view').addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); if (auth.currentUser) showContextMenu(contextMenuBg, e.clientX, e.clientY); });
+        document.getElementById('grid-view').addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); if (userId) showContextMenu(contextMenuBg, e.clientX, e.clientY); });
         backButton.addEventListener('click', navigateBack);
         logoButton.addEventListener('click', () => { location.hash = 'folder/root'; });
         
@@ -881,9 +909,9 @@
 
         document.getElementById('add-album-btn').addEventListener('click', e => { e.preventDefault(); createItem('album'); hideAllContextMenus(); });
         document.getElementById('add-folder-btn').addEventListener('click', e => { e.preventDefault(); createItem('folder'); hideAllContextMenus(); });
-        document.getElementById('rename-btn').addEventListener('click', e => { e.preventDefault(); document.getElementById('rename-input').value = contextTarget.data.title; showModal(renameModal); hideAllContextMenus(); });
-        document.getElementById('edit-btn').addEventListener('click', e => { e.preventDefault(); if(contextTarget.data.type === 'album') { document.getElementById('edit-title').value = contextTarget.data.title; document.getElementById('edit-artist').value = contextTarget.data.artist; document.getElementById('edit-image-url').value = contextTarget.data.imageUrl; showModal(editModal); } hideAllContextMenus(); });
-        document.getElementById('delete-btn').addEventListener('click', async e => { e.preventDefault(); hideAllContextMenus(); const confirmed = await showConfirmation('Delete Item?', `You are about to delete "${contextTarget.data.title}". This cannot be undone.`); if (confirmed) { deleteItem(contextTarget.id); } });
+        document.getElementById('rename-btn').addEventListener('click', e => { e.preventDefault(); document.getElementById('rename-input').value = contextTarget.title; showModal(renameModal); hideAllContextMenus(); });
+        document.getElementById('edit-btn').addEventListener('click', e => { e.preventDefault(); if(contextTarget.type === 'album') { document.getElementById('edit-title').value = contextTarget.title; document.getElementById('edit-artist').value = contextTarget.artist; document.getElementById('edit-image-url').value = contextTarget.image_url; showModal(editModal); } hideAllContextMenus(); });
+        document.getElementById('delete-btn').addEventListener('click', async e => { e.preventDefault(); hideAllContextMenus(); const confirmed = await showConfirmation('Delete Item?', `You are about to delete "${contextTarget.title}". This cannot be undone.`); if (confirmed) { deleteItem(contextTarget.id); } });
         document.getElementById('track-remove-btn').addEventListener('click', e => { e.preventDefault(); if (trackContextTarget) { removeTrack(currentAlbum.id, trackContextTarget.id); } hideAllContextMenus(); });
         suggestArtBtn.addEventListener('click', generateCoverArt);
         
@@ -893,7 +921,7 @@
             if (!newTitle) return;
 
             const isDuplicate = currentItemDocs.some(item =>
-                item.id !== contextTarget.id && item.data.title.toLowerCase() === newTitle.toLowerCase()
+                item.id !== contextTarget.id && item.title.toLowerCase() === newTitle.toLowerCase()
             );
 
             if (isDuplicate) {
@@ -905,50 +933,60 @@
             hideModal(renameModal); 
         });
 
-        document.getElementById('edit-form').addEventListener('submit', async e => { e.preventDefault(); const newData = { title: document.getElementById('edit-title').value, artist: document.getElementById('edit-artist').value, imageUrl: document.getElementById('edit-image-url').value }; if (newData.title && newData.artist && newData.imageUrl) await updateItem(contextTarget.id, newData); hideModal(editModal); });
+        document.getElementById('edit-form').addEventListener('submit', async e => { e.preventDefault(); const newData = { title: document.getElementById('edit-title').value, artist: document.getElementById('edit-artist').value, image_url: document.getElementById('edit-image-url').value }; if (newData.title && newData.artist && newData.image_url) await updateItem(contextTarget.id, newData); hideModal(editModal); });
         document.querySelectorAll('.modal-cancel').forEach(btn => btn.addEventListener('click', () => { hideModal(renameModal); hideModal(editModal); }));
         document.getElementById('confirm-cancel-btn').addEventListener('click', () => hideModal(confirmModal));
         document.getElementById('settings-close-btn').addEventListener('click', () => hideModal(settingsModal));
 
         // --- Initialize ---
         function initializeAppState() {
-            if (!auth.currentUser) return; // Wait for user to sign in
-            const savedStateJSON = localStorage.getItem(`project1_state_${auth.currentUser.uid}`);
-            if (savedStateJSON) {
-                try {
-                    const savedState = JSON.parse(savedStateJSON);
-                    
-                    if (savedState.player) {
-                        currentPlaylist = savedState.player.playlist;
-                        currentTrackIndex = savedState.player.trackIndex;
-                        const track = currentPlaylist[currentTrackIndex];
-                        
-                        audio.src = track.fileUrl;
-                        audio.addEventListener('loadedmetadata', () => {
-                            audio.currentTime = savedState.player.currentTime;
-                            if (audio.duration) {
-                                currentTimeEl.textContent = formatTime(audio.currentTime);
-                                totalTimeEl.textContent = formatTime(audio.duration);
-                                const progressPercent = (audio.currentTime / audio.duration) * 100;
-                                progressBar.style.width = `${progressPercent}%`;
-                            }
-                        }, { once: true });
+            supabase.auth.getSession().then(({ data: { session } }) => {
+                if (session) {
+                    const savedStateJSON = localStorage.getItem(`project1_state_${session.user.id}`);
+                    if (savedStateJSON) {
+                        try {
+                            const savedState = JSON.parse(savedStateJSON);
+                            
+                            if (savedState.player) {
+                                currentPlaylist = savedState.player.playlist;
+                                currentTrackIndex = savedState.player.trackIndex;
+                                const track = currentPlaylist[currentTrackIndex];
+                                
+                                audio.src = track.fileUrl;
+                                audio.addEventListener('loadedmetadata', () => {
+                                    audio.currentTime = savedState.player.currentTime;
+                                    if (audio.duration) {
+                                        currentTimeEl.textContent = formatTime(audio.currentTime);
+                                        totalTimeEl.textContent = formatTime(audio.duration);
+                                        const progressPercent = (audio.currentTime / audio.duration) * 100;
+                                        progressBar.style.width = `${progressPercent}%`;
+                                    }
+                                }, { once: true });
 
-                        updatePlayerUI(track);
-                        playerBar.classList.add('visible');
-                        updatePlayPauseIcon();
+                                updatePlayerUI(track);
+                                playerBar.classList.add('visible');
+                                updatePlayPauseIcon();
+                            }
+                        } catch (error) {
+                            console.error("Failed to restore player state:", error);
+                            localStorage.removeItem(`project1_state_${session.user.id}`);
+                        }
                     }
-                } catch (error) {
-                    console.error("Failed to restore player state:", error);
-                    localStorage.removeItem(`project1_state_${auth.currentUser.uid}`);
                 }
-            }
+            });
             
             // Handle initial navigation based on hash
             handleHashChange();
         }
 
-        initializeFirebase();
+        async function init() {
+            supabase.auth.onAuthStateChange(handleAuthChange);
+            const session = await getSession();
+            handleAuthChange('SIGNED_IN', session);
+            initializeAppState();
+        }
+
+        init();
     </script>
 </body>
 </html>
