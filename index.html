@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project_1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        /* Style for the video player's timeline */
+        video::-webkit-media-controls-timeline {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+        /* Custom context menu should not be selectable */
+        #context-menu {
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-[#3D3D3D] text-white font-sans flex h-screen overflow-hidden">
+
+    <!-- Main Content: Video Player and Drop Zone -->
+    <main id="drop-zone" class="flex-grow flex flex-col items-center justify-center h-full p-4 transition-all duration-300 bg-[#3D3D3D]">
+        <div id="video-container" class="w-full max-w-6xl h-full bg-[#3D3D3D] rounded-lg shadow-2xl flex items-center justify-center relative group">
+            <!-- Initial state: Blank background -->
+            <div id="drop-message" class="text-center p-8">
+                <!-- Content removed to make the background blank -->
+            </div>
+            <!-- Video player, initially hidden -->
+            <video id="player" class="w-full h-full object-contain rounded-lg hidden"></video>
+            <!-- URL display overlay -->
+            <div id="url-overlay" class="absolute top-0 left-0 w-full p-4 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden">
+                <p class="text-sm text-gray-300">Share this link:</p>
+                <div class="flex items-center mt-1">
+                    <input id="share-url" type="text" readonly class="w-full bg-gray-800 text-gray-200 border border-gray-700 rounded-l-md p-2 text-sm focus:outline-none">
+                    <button id="copy-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-r-md">Copy</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Custom Right-Click Context Menu -->
+    <div id="context-menu" class="hidden absolute bg-gray-900 text-white w-48 rounded-md shadow-lg py-1 z-50">
+        <a href="#" id="add-album" class="block px-4 py-2 text-sm hover:bg-indigo-600"> + Add Album</a>
+        <a href="#" id="add-folder" class="block px-4 py-2 text-sm hover:bg-indigo-600"> + Add Folder</a>
+    </div>
+
+
+    <script>
+        // --- IMPORTANT SETUP ---
+        // Replace this URL with the URL of your deployed back-end server
+        const SERVER_URL = "https://project-1-backend.onrender.com"; // Example for Render
+
+        // --- DOM Elements ---
+        const dropZone = document.getElementById('drop-zone');
+        const videoContainer = document.getElementById('video-container');
+        const player = document.getElementById('player');
+        const dropMessage = document.getElementById('drop-message');
+        const urlOverlay = document.getElementById('url-overlay');
+        const shareUrlInput = document.getElementById('share-url');
+        const copyButton = document.getElementById('copy-button');
+        const contextMenu = document.getElementById('context-menu');
+
+        // --- State Management ---
+        let socket;
+        let roomId;
+        let isSeeking = false; // Flag to prevent event loops on seek
+        let seekTimeout;
+
+        // --- Core Logic ---
+
+        // 1. Room Management: Get or create a room ID from the URL
+        function initializeRoom() {
+            const path = window.location.pathname.split('/').filter(p => p);
+            if (path.length > 0 && path[0].length > 5) { // Assume if there's a path, it's a room ID
+                roomId = path[0];
+            } else {
+                roomId = generateRoomId();
+                // Redirect to the new room URL
+                window.history.pushState({}, '', `/${roomId}`);
+            }
+            shareUrlInput.value = window.location.href;
+            connectToServer();
+        }
+
+        // 2. Generate a random ID for the room
+        function generateRoomId(length = 8) {
+            return Math.random().toString(36).substring(2, 2 + length);
+        }
+
+        // 3. Connect to the Socket.IO server
+        function connectToServer() {
+            socket = io(SERVER_URL);
+
+            socket.on('connect', () => {
+                console.log('Connected to server with ID:', socket.id);
+                socket.emit('joinRoom', roomId);
+                console.log(`You connected. Room ID: ${roomId}`);
+            });
+
+            socket.on('userJoined', (id) => {
+                console.log(`User ${id.slice(0, 4)} joined the room.`);
+            });
+
+            socket.on('userLeft', (id) => {
+                console.log(`User ${id.slice(0, 4)} left the room.`);
+            });
+
+            // Listen for media control events from other users
+            socket.on('play', (time) => handleRemotePlay(time));
+            socket.on('pause', () => handleRemotePause());
+            socket.on('seek', (time) => handleRemoteSeek(time));
+        }
+
+        // --- Context Menu Handling ---
+        dropZone.addEventListener('contextmenu', (e) => {
+            e.preventDefault(); // Prevent the default browser right-click menu
+            
+            // Position the menu at the cursor's location
+            contextMenu.style.top = `${e.clientY}px`;
+            contextMenu.style.left = `${e.clientX}px`;
+            
+            // Show the menu
+            contextMenu.classList.remove('hidden');
+        });
+
+        // Hide the context menu if the user clicks anywhere else
+        window.addEventListener('click', () => {
+            contextMenu.classList.add('hidden');
+        });
+
+        // Add placeholder functionality to menu items
+        document.getElementById('add-album').addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Add Album clicked');
+            contextMenu.classList.add('hidden');
+        });
+        document.getElementById('add-folder').addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Add Folder clicked');
+            contextMenu.classList.add('hidden');
+        });
+
+
+        // --- Drag and Drop Handling ---
+        
+        // Prevent default browser behavior for drag events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Highlight drop zone when item is dragged over
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => videoContainer.classList.add('border-4', 'border-dashed', 'border-[#1A1A1A]'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => videoContainer.classList.remove('border-4', 'border-dashed', 'border-[#1A1A1A]'), false);
+        });
+
+        // Handle the file drop
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            if (files.length > 0) {
+                const file = files[0];
+                // Check if the file is a video or audio file
+                if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+                    const fileURL = URL.createObjectURL(file);
+                    player.src = fileURL;
+                    player.style.display = 'block';
+                    dropMessage.style.display = 'none';
+                    urlOverlay.style.display = 'block';
+                    player.controls = true;
+                } else {
+                    console.error('Error: Please drop a valid video or audio file.');
+                }
+            }
+        });
+
+        // --- Media Player Synchronization ---
+
+        // Local event listeners (send events to server)
+        player.addEventListener('play', () => {
+            console.log('Local: play');
+            socket.emit('play', { room: roomId, time: player.currentTime });
+        });
+
+        player.addEventListener('pause', () => {
+            // Don't emit pause event if it was caused by seeking
+            if (!isSeeking) {
+                console.log('Local: pause');
+                socket.emit('pause', { room: roomId });
+            }
+        });
+        
+        player.addEventListener('timeupdate', () => {
+            if (!player.paused && !player.seeking) {
+                isSeeking = true;
+                clearTimeout(seekTimeout);
+                seekTimeout = setTimeout(() => {
+                    console.log('Local: seek (from timeupdate)');
+                    socket.emit('seek', { room: roomId, time: player.currentTime });
+                    isSeeking = false;
+                }, 500); // Emit seek event every 500ms while playing
+            }
+        });
+        
+        player.addEventListener('seeking', () => {
+             isSeeking = true;
+        });
+
+        player.addEventListener('seeked', () => {
+            console.log('Local: seeked');
+            socket.emit('seek', { room: roomId, time: player.currentTime });
+            isSeeking = false;
+        });
+
+
+        // Remote event handlers (react to events from server)
+        function handleRemotePlay(time) {
+            console.log('Remote: play');
+            if (Math.abs(player.currentTime - time) > 0.5) {
+                player.currentTime = time;
+            }
+            player.play();
+        }
+
+        function handleRemotePause() {
+            console.log('Remote: pause');
+            player.pause();
+        }
+
+        function handleRemoteSeek(time) {
+            console.log('Remote: seek');
+            // Check if the time difference is significant enough to warrant a seek
+            if (Math.abs(player.currentTime - time) > 1) {
+                player.currentTime = time;
+            }
+        }
+
+        // --- Utility ---
+        copyButton.addEventListener('click', () => {
+            shareUrlInput.select();
+            document.execCommand('copy');
+            copyButton.textContent = 'Copied!';
+            setTimeout(() => { copyButton.textContent = 'Copy'; }, 2000);
+        });
+
+        // --- Initialize the application ---
+        document.addEventListener('DOMContentLoaded', initializeRoom);
+
+    </script>
+</body>
+</html>
