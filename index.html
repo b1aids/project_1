@@ -88,6 +88,17 @@
             height: 50px; /* Height of the waveform */
             cursor: pointer;
         }
+        
+        /* --- Player Icon Styling --- */
+        .player-icon {
+            width: 20px;
+            height: 20px;
+            filter: invert(1); /* Makes the black icons white */
+        }
+        .play-pause-icon {
+            width: 24px;
+            height: 24px;
+        }
     </style>
 </head>
 <body class="antialiased">
@@ -154,11 +165,10 @@
                  <!-- Waveform Canvas replaces the progress bar -->
                 <canvas id="waveform-canvas"></canvas>
                 <div class="flex items-center gap-4">
-                    <button id="shuffle-btn" class="p-2 hover:text-green-500 transition-colors"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M3.478 5.555A.5.5 0 003 6v8a.5.5 0 00.978.222l2-4a.5.5 0 000-.444l-2-4a.5.5 0 00-.5-.222zM15.5 5.5a.5.5 0 01.978-.222l2 4a.5.5 0 010 .444l-2 4A.5.5 0 0115.5 14V5.5zM12.978 4.222a.5.5 0 00-.956 0l-2.5 5a.5.5 0 000 .556l2.5 5a.5.5 0 00.956-.222l2.5-5a.5.5 0 000-.556l-2.5-5zM6.53 9.098a.5.5 0 000 .804l2 1.5a.5.5 0 00.82-.325V7.923a.5.5 0 00-.82-.325l-2 1.5z"></path></svg></button>
-                    <button id="prev-btn" class="p-2"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M8.445 14.832A1 1 0 0010 14.155V5.845a1 1 0 00-1.555-.832L4.12 8.168a1 1 0 000 1.664l4.325 3.001zM15.555 4.168A1 1 0 0014 5.832v8.323a1 1 0 001.555.832l4.325-3.001a1 1 0 000-1.664l-4.325-3.001z"></path></svg></button>
-                    <button id="play-pause-btn" class="p-3 bg-white text-black rounded-full"><svg id="play-icon" class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M4.018 15.59a.5.5 0 00.816.372l10-6a.5.5 0 000-.744l-10-6A.5.5 0 004.018 4.41v11.18z"></path></svg><svg id="pause-icon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z"></path></svg></button>
-                    <button id="next-btn" class="p-2"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M4.445 4.168A1 1 0 003 5.832v8.323a1 1 0 001.445.894l4.325-3.001a1 1 0 000-1.788L4.445 4.168zM11.555 4.168A1 1 0 0010 5.832v8.323a1 1 0 001.555.832l4.325-3.001a1 1 0 000-1.664l-4.325-3.001z"></path></svg></button>
-                    <button id="stop-btn" class="p-2"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3.75A1.75 1.75 0 003.25 5.5v9A1.75 1.75 0 005 16.25h10A1.75 1.75 0 0016.75 14.5v-9A1.75 1.75 0 0015 3.75H5z"></path></svg></button>
+                    <button id="shuffle-btn" class="p-2"><img src="./img/controls/loop.png" class="player-icon"></button>
+                    <button id="prev-btn" class="p-2"><img src="./img/controls/back.png" class="player-icon"></button>
+                    <button id="play-pause-btn" class="p-3 bg-white text-black rounded-full"><img id="play-pause-icon" src="./img/controls/play.png" class="play-pause-icon"></button>
+                    <button id="next-btn" class="p-2"><img src="./img/controls/skip.png" class="player-icon"></button>
                 </div>
                 <div class="w-full flex items-center gap-2 text-xs -mt-2">
                     <span id="current-time">0:00</span>
@@ -243,9 +253,8 @@
         const imageUpload = document.getElementById('image-upload');
         const albumArtWrapper = document.getElementById('album-art-wrapper');
         const playerBar = document.getElementById('player-bar');
-        const playPauseBtn = document.getElementById('play-pause-btn'), playIcon = document.getElementById('play-icon'), pauseIcon = document.getElementById('pause-icon');
+        const playPauseBtn = document.getElementById('play-pause-btn'), playPauseIcon = document.getElementById('play-pause-icon');
         const waveformCanvas = document.getElementById('waveform-canvas');
-        const stopBtn = document.getElementById('stop-btn');
         const nextBtn = document.getElementById('next-btn');
         const prevBtn = document.getElementById('prev-btn');
         const shuffleBtn = document.getElementById('shuffle-btn');
@@ -381,7 +390,6 @@
             const barWidth = (WIDTH / dataArray.length) * 1.5;
             let x = 0;
 
-            // Create a fiery gradient
             const gradient = canvasCtx.createLinearGradient(0, 0, 0, HEIGHT);
             gradient.addColorStop(0, 'red');
             gradient.addColorStop(0.5, 'orange');
@@ -394,7 +402,6 @@
                 x += barWidth + 1;
             }
             
-            // Draw progress overlay
             if (audio.duration) {
                 const progress = audio.currentTime / audio.duration;
                 canvasCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
@@ -409,7 +416,7 @@
         function playNext() { if (currentPlaylist.length === 0) return; let nextIndex = isShuffle ? Math.floor(Math.random() * currentPlaylist.length) : currentTrackIndex + 1; if (nextIndex >= currentPlaylist.length) nextIndex = 0; playTrack(nextIndex); }
         function playPrev() { if (currentPlaylist.length === 0) return; let prevIndex = currentTrackIndex - 1; if (prevIndex < 0) prevIndex = currentPlaylist.length - 1; playTrack(prevIndex); }
         function updatePlayerUI(track) { document.getElementById('player-album-art').src = track.albumArt; document.getElementById('player-track-title').textContent = track.fileName; document.getElementById('player-track-artist').textContent = track.artist; }
-        function updatePlayPauseIcon() { playIcon.classList.toggle('hidden', isPlaying); pauseIcon.classList.toggle('hidden', !isPlaying); }
+        function updatePlayPauseIcon() { playPauseIcon.src = isPlaying ? './img/controls/pause.png' : './img/controls/play.png'; }
         function formatTime(seconds) { const minutes = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60); return `${minutes}:${secs < 10 ? '0' : ''}${secs}`; }
 
         // --- Firestore & Storage Logic ---
@@ -457,7 +464,6 @@
         ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.add('bg-gray-700', 'border-indigo-500'), false));
         ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove('bg-gray-700', 'border-indigo-500'), false));
         playPauseBtn.addEventListener('click', togglePlayPause);
-        stopBtn.addEventListener('click', stopPlayback);
         nextBtn.addEventListener('click', playNext);
         prevBtn.addEventListener('click', playPrev);
         shuffleBtn.addEventListener('click', () => { isShuffle = !isShuffle; shuffleBtn.classList.toggle('text-green-500', isShuffle); });
