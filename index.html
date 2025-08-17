@@ -123,10 +123,11 @@
                         <p id="album-view-artist" class="text-lg text-gray-400"></p>
                         <p id="album-view-meta" class="text-sm text-gray-500 mt-1"></p>
                     </div>
-                    <div id="drop-zone" class="w-full md:w-2/3 lg:w-3/4">
+                    <div class="w-full md:w-2/3 lg:w-3/4">
                         <div id="track-list" class="space-y-1"></div>
-                        <div id="drop-message" class="mt-4 text-center p-8 border-2 border-dashed border-gray-700 rounded-lg transition-all">
-                            <p class="text-gray-500">Drag & Drop Audio Files Here to Add Tracks</p>
+                        <div id="drop-zone" class="mt-4 text-center p-8 border-2 border-dashed border-gray-700 rounded-lg transition-all cursor-pointer hover:bg-gray-800 hover:border-indigo-500">
+                            <p class="text-gray-500">Drag & Drop Audio Files Here or Click to Upload</p>
+                            <input type="file" id="audio-upload" accept="audio/*" class="hidden" multiple>
                         </div>
                     </div>
                 </div>
@@ -248,6 +249,7 @@
         const contextMenuBg = document.getElementById('context-menu-bg'), contextMenuItem = document.getElementById('context-menu-item'), contextMenuTrack = document.getElementById('context-menu-track');
         const renameModal = document.getElementById('rename-modal'), editModal = document.getElementById('edit-modal'), confirmModal = document.getElementById('confirm-modal');
         const dropZone = document.getElementById('drop-zone');
+        const audioUpload = document.getElementById('audio-upload');
         const suggestArtBtn = document.getElementById('suggest-art-btn');
         const imageUpload = document.getElementById('image-upload');
         const albumArtWrapper = document.getElementById('album-art-wrapper');
@@ -604,10 +606,40 @@
 
         document.getElementById('grid-view').addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); if (auth.currentUser) showContextMenu(contextMenuBg, e.clientX, e.clientY); });
         backButton.addEventListener('click', navigateBack);
-        dropZone.addEventListener('drop', e => { for (const file of e.dataTransfer.files) { if (file.type.startsWith('audio/')) { addTrack(currentAlbum.id, file); } } });
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, false));
-        ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.add('bg-gray-700', 'border-indigo-500'), false));
-        ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove('bg-gray-700', 'border-indigo-500'), false));
+        
+        // --- Upload Listeners ---
+        dropZone.addEventListener('click', () => {
+            // This is where you would initiate a Google Drive Picker if you were to implement it.
+            // For now, it opens the local file picker.
+            audioUpload.click();
+        });
+        audioUpload.addEventListener('change', (e) => {
+            for (const file of e.target.files) {
+                if (file.type.startsWith('audio/')) {
+                    addTrack(currentAlbum.id, file);
+                }
+            }
+        });
+        dropZone.addEventListener('drop', e => { 
+            e.preventDefault(); 
+            e.stopPropagation();
+            dropZone.classList.remove('bg-gray-700', 'border-indigo-500');
+            for (const file of e.dataTransfer.files) { 
+                if (file.type.startsWith('audio/')) { 
+                    addTrack(currentAlbum.id, file); 
+                } 
+            } 
+        });
+        ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, e => { 
+            e.preventDefault(); 
+            e.stopPropagation();
+            dropZone.classList.add('bg-gray-700', 'border-indigo-500');
+        }, false));
+        ['dragleave'].forEach(ev => dropZone.addEventListener(ev, e => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('bg-gray-700', 'border-indigo-500');
+        }, false));
         
         playPauseBtn.addEventListener('click', togglePlayPause);
         nextBtn.addEventListener('click', playNext);
