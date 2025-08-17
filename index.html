@@ -317,7 +317,15 @@
         async function initializeFirebase() {
             // Check for required global variables for the Canvas environment
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+            const firebaseConfig = {
+                apiKey: "AIzaSyB4-unm8Z03o3XXgjjlZcIY2tiSskqO2Xc",
+                authDomain: "project-1-f9e5b.firebaseapp.com",
+                projectId: "project-1-f9e5b",
+                storageBucket: "project-1-f9e5b.firebasestorage.app",
+                messagingSenderId: "272340259942",
+                appId: "1:272340259942:web:a5a5a302342e0b4eb389a7",
+                measurementId: "G-EKL8BPFSG1"
+            };
             const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
             if (!firebaseConfig) {
