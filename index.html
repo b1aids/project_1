@@ -261,7 +261,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, serverTimestamp, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- State Management ---
@@ -318,9 +318,8 @@
         const totalTimeEl = document.getElementById('total-time');
         const userProfileDiv = document.getElementById('user-profile');
         const connectDriveBtn = document.getElementById('connect-drive-btn');
-        const driveConnectStatus = document.getElementById('drive-connect-status');
-        const connectDiscordBtn = document.getElementById('connect-discord-btn');
         const discordConnectStatus = document.getElementById('discord-connect-status');
+        const connectDiscordBtn = document.getElementById('connect-discord-btn');
         
         // --- Firebase Setup ---
         async function initializeFirebase() {
@@ -831,14 +830,13 @@
             audio.currentTime = percent * audio.duration; 
         });
 
-        document.getElementById('add-album-btn').addEventListener('click', e => { e.preventDefault(); createItem('album'); hideAllContextMenus(); });
-        document.getElementById('add-folder-btn').addEventListener('click', e => { e.preventDefault(); createItem('folder'); hideAllContextMenus(); });
+        document.getElementById('add-album-btn').addEventListener('click', e => { e.preventDefault(); if (auth.currentUser) createItem('album'); hideAllContextMenus(); });
+        document.getElementById('add-folder-btn').addEventListener('click', e => { e.preventDefault(); if (auth.currentUser) createItem('folder'); hideAllContextMenus(); });
         document.getElementById('rename-btn').addEventListener('click', e => { e.preventDefault(); document.getElementById('rename-input').value = contextTarget.data.title; showModal(renameModal); hideAllContextMenus(); });
         document.getElementById('edit-btn').addEventListener('click', e => { e.preventDefault(); if(contextTarget.data.type === 'album') { document.getElementById('edit-title').value = contextTarget.data.title; document.getElementById('edit-artist').value = contextTarget.data.artist; document.getElementById('edit-image-url').value = contextTarget.data.imageUrl; showModal(editModal); } hideAllContextMenus(); });
         document.getElementById('delete-btn').addEventListener('click', async e => { e.preventDefault(); hideAllContextMenus(); const confirmed = await showConfirmation('Delete Item?', `You are about to delete "${contextTarget.data.title}". This cannot be undone.`); if (confirmed) { deleteItem(contextTarget.id); } });
         document.getElementById('track-remove-btn').addEventListener('click', e => { e.preventDefault(); if (trackContextTarget) { removeTrack(currentAlbum.id, trackContextTarget.id); } hideAllContextMenus(); });
         suggestArtBtn.addEventListener('click', generateCoverArt);
-        connectDiscordBtn.addEventListener('click', handleDiscordAuthClick);
         
         document.getElementById('rename-form').addEventListener('submit', e => { 
             e.preventDefault(); 
