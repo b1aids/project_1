@@ -344,9 +344,14 @@
                 auth = getAuth(app);
                 
                 const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                if (authToken) {
-                    await signInWithCustomToken(auth, authToken);
-                } else {
+                try {
+                    if (authToken) {
+                        await signInWithCustomToken(auth, authToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (e) {
+                    console.error("Custom token sign-in failed, attempting anonymous sign-in:", e);
                     await signInAnonymously(auth);
                 }
 
