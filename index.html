@@ -190,7 +190,7 @@
     </div>
     <div id="context-menu-bg" class="fixed bg-gray-900 text-white w-56 rounded-lg shadow-xl p-2 z-50 hidden opacity-0 transform scale-95 transition-all">
         <a href="#" id="add-album-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-12c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 6l12-3" /></svg>Add Album</a>
-        <a href="#" id="add-folder-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>Add Folder</a>
+        <a href="#" id="add-folder-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-l2-2H5a2 2 0 00-2 2z" /></svg>Add Folder</a>
     </div>
     <div id="context-menu-item" class="fixed bg-gray-900 text-white w-56 rounded-lg shadow-xl p-2 z-50 hidden opacity-0 transform scale-95 transition-all">
         <a href="#" id="rename-btn" class="flex items-center px-3 py-2 text-sm hover:bg-indigo-600 rounded-md transition-colors"><svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>Rename</a>
@@ -229,7 +229,7 @@
 
         // --- State Management ---
         let currentView = 'grid', currentFolderId = 'root', currentAlbum = null;
-        let navigationStack = [{id: 'root', title: 'project_1'}];
+        let navigationStack = [{id: 'root', title: 'project_1', type: 'folder'}];
         let contextTarget = null, trackContextTarget = null;
         let itemCount = 0;
         let tracksUnsubscribe = null, itemsUnsubscribe = null;
@@ -304,13 +304,32 @@
         }
         
         // --- Navigation & View Management ---
-        function navigateTo(folderId, folderTitle) { history.pushState({ view: 'grid', folderId, folderTitle }, folderTitle, `./folder/${folderId}`); navigationStack.push({id: folderId, title: folderTitle}); currentFolderId = folderId; updateView('grid'); }
-        function navigateBack() { if (currentView === 'album' || navigationStack.length > 1) { history.back(); } }
-        function showAlbumView(album) { currentAlbum = album; const albumUrl = `./album/${encodeURIComponent(album.data.title.replace(/\s+/g, '-'))}`; history.pushState({ view: 'album', albumId: album.id, folderId: currentFolderId }, album.data.title, albumUrl); updateView('album'); }
+        function navigateTo(folderId, folderTitle) { 
+            navigationStack.push({id: folderId, title: folderTitle, type: 'folder'});
+            history.pushState({ view: 'grid', folderId, folderTitle }, folderTitle, `./folder/${folderId}`); 
+            currentFolderId = folderId; 
+            updateView('grid'); 
+        }
+
+        function navigateBack() { 
+            if (currentView === 'album' || navigationStack.length > 1) { 
+                history.back(); 
+            } 
+        }
+
+        function showAlbumView(album) { 
+            currentAlbum = album; 
+            const albumUrl = `./album/${encodeURIComponent(album.data.title.replace(/\s+/g, '-'))}`; 
+            navigationStack.push({id: album.id, title: album.data.title, type: 'album'});
+            history.pushState({ view: 'album', albumId: album.id, folderId: currentFolderId }, album.data.title, albumUrl); 
+            updateView('album'); 
+        }
+
         function updateView(view) {
             currentView = view;
             if (itemsUnsubscribe) { itemsUnsubscribe(); itemsUnsubscribe = null; }
             if (tracksUnsubscribe) { tracksUnsubscribe(); tracksUnsubscribe = null; }
+            
             if (view === 'grid') {
                 const currentFolder = navigationStack[navigationStack.length - 1];
                 currentFolderId = currentFolder.id;
@@ -435,8 +454,16 @@
         function listenForItems() { if (window.itemsCollectionRef) { if (itemsUnsubscribe) itemsUnsubscribe(); const q = query(itemsCollectionRef, where("parentId", "==", currentFolderId)); itemsUnsubscribe = onSnapshot(q, s => renderItems(s.docs.sort((a, b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for items:", e)); } }
         function listenForTracks(albumId) { if (window.itemsCollectionRef) { const tracksRef = collection(db, `${itemsCollectionRef.path}/${albumId}/tracks`); if (tracksUnsubscribe) tracksUnsubscribe(); tracksUnsubscribe = onSnapshot(query(tracksRef), s => renderTracks(s.docs.sort((a,b) => (a.data().createdAt?.toDate()||0) - (b.data().createdAt?.toDate()||0))), e => console.error("Error listening for tracks:", e)); } }
         async function createItem(type) { if (window.itemsCollectionRef) { const name = `New ${type} ${itemCount + 1}`; const data = { title: name, type, parentId: currentFolderId, createdAt: serverTimestamp() }; if (type === 'album') { data.artist = 'Untitled Artist'; data.imageUrl = `https://placehold.co/400x400/5865F2/FFFFFF?text=${encodeURIComponent(name)}`; } await addDoc(itemsCollectionRef, data); } }
+        
         async function addTrack(albumId, file) {
             if (!window.itemsCollectionRef || !window.userId) return;
+            
+            const trackList = document.getElementById('track-list');
+            const placeholderEl = document.createElement('div');
+            placeholderEl.className = 'flex items-center p-2 rounded-md text-gray-500 animate-pulse';
+            placeholderEl.innerHTML = `<div class="w-8 text-right mr-4">...</div><div class="flex-grow">${file.name} (Uploading...)</div>`;
+            trackList.appendChild(placeholderEl);
+
             const storageRef = ref(storage, `users/${userId}/tracks/${Date.now()}_${file.name}`);
             try {
                 const snapshot = await uploadBytes(storageRef, file);
@@ -445,8 +472,11 @@
                 await addDoc(tracksRef, { fileName: file.name, fileUrl: downloadURL, createdAt: serverTimestamp() });
             } catch (error) {
                 console.error("Error uploading file:", error);
+                placeholderEl.remove();
+                showConfirmation("Upload Failed", `Could not upload ${file.name}. Please check your connection and Firebase Storage rules.`, true);
             }
         }
+
         async function removeTrack(albumId, trackId) { if (window.itemsCollectionRef) { await deleteDoc(doc(db, `${itemsCollectionRef.path}/${albumId}/tracks`, trackId)); } }
         async function updateItem(id, data) { if(window.itemsCollectionRef) await updateDoc(doc(db, itemsCollectionRef.path, id), data); }
         async function deleteItem(id) { if(window.itemsCollectionRef) await deleteDoc(doc(db, itemsCollectionRef.path, id)); }
@@ -468,7 +498,19 @@
         function showConfirmation(title, message, isAlert = false) { return new Promise((resolve) => { const confirmTitle = document.getElementById('confirm-title'), confirmMessage = document.getElementById('confirm-message'), okBtn = document.getElementById('confirm-ok-btn'), cancelBtn = document.getElementById('confirm-cancel-btn'); confirmTitle.textContent = title; confirmMessage.textContent = message; if(isAlert) { okBtn.textContent = 'OK'; okBtn.className = 'py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors'; cancelBtn.classList.add('hidden'); } else { okBtn.textContent = 'Delete'; okBtn.className = 'py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors'; cancelBtn.classList.remove('hidden'); } showModal(confirmModal); const okHandler = () => { hideModal(confirmModal); resolve(true); cleanup(); }; const cancelHandler = () => { hideModal(confirmModal); resolve(false); cleanup(); }; function cleanup() { okBtn.removeEventListener('click', okHandler); cancelBtn.removeEventListener('click', cancelHandler); } okBtn.addEventListener('click', okHandler, { once: true }); cancelBtn.addEventListener('click', cancelHandler, { once: true }); }); }
 
         // --- Event Listeners ---
-        window.addEventListener('popstate', (event) => { if (event.state) { if (currentView === 'album') { navigationStack.pop(); } navigationStack.pop(); if (navigationStack.length === 0) navigationStack.push({id: 'root', title: 'project_1'}); updateView('grid'); } else { navigationStack = [{id: 'root', title: 'project_1'}]; updateView('grid'); } });
+        window.addEventListener('popstate', (event) => {
+            if (event.state) {
+                const lastState = navigationStack[navigationStack.length - 1];
+                if (lastState && lastState.id !== event.state.folderId && lastState.id !== event.state.albumId) {
+                     navigationStack.pop();
+                }
+                updateView('grid');
+            } else {
+                navigationStack = [{id: 'root', title: 'project_1', type: 'folder'}];
+                updateView('grid');
+            }
+        });
+
         document.getElementById('grid-view').addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showContextMenu(contextMenuBg, e.clientX, e.clientY); });
         backButton.addEventListener('click', navigateBack);
         dropZone.addEventListener('drop', e => { for (const file of e.dataTransfer.files) { if (file.type.startsWith('audio/')) { addTrack(currentAlbum.id, file); } } });
